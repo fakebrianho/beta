@@ -102,31 +102,63 @@ app.post("/api/auth/logout", (req, res) => {
 app.get("/api/auth/me", requireAuth, (req, res) => res.json(req.user));
 
 // ---- Passwordless (magic link) ----
-// The link carries a short-lived JWT. Without RESEND_API_KEY the link is
-// printed to the server console instead of emailed (free dev mode).
+// The link carries a short-lived JWT. Sent via Brevo (BREVO_API_KEY +
+// MAIL_FROM, a sender address verified in Brevo). Falls back to Resend
+// (RESEND_API_KEY), then to printing the link in the server console (dev).
+const MAGIC_SUBJECT = "Your Beta Coach sign-in link";
+const magicHtml = (link) =>
+  `<p>Click to sign in to Beta Coach:</p><p><a href="${link}">Sign in</a></p><p>This link expires in 15 minutes.</p>`;
+
 async function sendMagicEmail(email, link) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log(`\n🔗 Magic sign-in link for ${email}:\n${link}\n`);
-    return { dev: true };
+  if (process.env.BREVO_API_KEY) {
+    // MAIL_FROM: "Name <email>" or a bare email
+    const raw = process.env.MAIL_FROM || "";
+    const m = raw.match(/^(.*)<(.+)>$/);
+    const sender = m
+      ? { name: m[1].trim() || "Beta Coach", email: m[2].trim() }
+      : { name: "Beta Coach", email: raw.trim() };
+    if (!sender.email) throw new Error("Set MAIL_FROM to your verified Brevo sender");
+    const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": process.env.BREVO_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email }],
+        subject: MAGIC_SUBJECT,
+        htmlContent: magicHtml(link),
+      }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.message || "Email send failed");
+    }
+    return { dev: false };
   }
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: process.env.MAIL_FROM || "Beta Coach <onboarding@resend.dev>",
-      to: email,
-      subject: "Your Beta Coach sign-in link",
-      html: `<p>Click to sign in to Beta Coach:</p><p><a href="${link}">Sign in</a></p><p>This link expires in 15 minutes.</p>`,
-    }),
-  });
-  if (!r.ok) {
-    const body = await r.json().catch(() => ({}));
-    throw new Error(body.message || "Email send failed");
+  if (process.env.RESEND_API_KEY) {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: process.env.MAIL_FROM || "Beta Coach <onboarding@resend.dev>",
+        to: email,
+        subject: MAGIC_SUBJECT,
+        html: magicHtml(link),
+      }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.message || "Email send failed");
+    }
+    return { dev: false };
   }
-  return { dev: false };
+  console.log(`\n🔗 Magic sign-in link for ${email}:\n${link}\n`);
+  return { dev: true };
 }
 
 function appUrl(req) {
