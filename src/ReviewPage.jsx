@@ -76,7 +76,6 @@ export default function ReviewPage({ videoId, role, onBack }) {
     await api.addComment(videoId, {
       time: v().currentTime,
       text: commentText.trim(),
-      author: role === "coach" ? "Coach" : video?.student || "Student",
       drawing: strokes.length ? { strokes, duration: hold } : null,
     });
     setCommentText("");

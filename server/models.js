@@ -1,0 +1,57 @@
+import mongoose from "mongoose";
+
+const userSchema = new mongoose.Schema(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    passwordHash: { type: String, default: null }, // null for passwordless (magic-link) accounts
+    role: { type: String, enum: ["student", "coach"], default: "student" },
+  },
+  { timestamps: true }
+);
+
+const videoSchema = new mongoose.Schema(
+  {
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    title: { type: String, required: true },
+    student: String, // owner's display name, denormalized for listing
+    notes: { type: String, default: "" },
+    url: { type: String, required: true }, // Vercel Blob URL (or /uploads/... for legacy local files)
+    status: { type: String, enum: ["submitted", "reviewed"], default: "submitted" },
+  },
+  { timestamps: true }
+);
+
+const commentSchema = new mongoose.Schema(
+  {
+    video: { type: mongoose.Schema.Types.ObjectId, ref: "Video", required: true, index: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    author: String,
+    time: { type: Number, required: true },
+    text: { type: String, default: "" },
+    drawing: { type: mongoose.Schema.Types.Mixed, default: null },
+  },
+  { timestamps: true }
+);
+
+// Serve the same shape the client already expects (id, url, createdAt)
+const clean = (schema) =>
+  schema.set("toJSON", {
+    virtuals: true,
+    versionKey: false,
+    transform: (doc, ret) => {
+      ret.id = ret._id.toString();
+      delete ret._id;
+      delete ret.passwordHash;
+      if (ret.video) ret.videoId = ret.video.toString();
+      return ret;
+    },
+  });
+
+clean(userSchema);
+clean(videoSchema);
+clean(commentSchema);
+
+export const User = mongoose.model("User", userSchema);
+export const Video = mongoose.model("Video", videoSchema);
+export const Comment = mongoose.model("Comment", commentSchema);

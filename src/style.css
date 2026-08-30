@@ -49,6 +49,31 @@ input, textarea, select {
 .role-toggle button { background: transparent; padding: 6px 14px; }
 .role-toggle button.active { background: var(--accent); }
 
+.user-chip { display: flex; align-items: center; gap: 12px; }
+
+/* auth */
+.auth-page { display: flex; justify-content: center; padding: 60px 20px; }
+.auth-card {
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 380px;
+}
+.auth-card h2 { margin-top: 0; }
+.auth-card form { display: flex; flex-direction: column; gap: 10px; }
+.auth-card form button[type="submit"] { background: var(--accent); }
+.auth-role { justify-content: stretch; }
+.auth-role button { flex: 1; }
+.auth-links { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.auth-links .link-btn { align-self: flex-start; }
+.link-btn {
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  text-decoration: underline;
+}
+
 /* dashboard */
 .dashboard { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
 .upload-card {

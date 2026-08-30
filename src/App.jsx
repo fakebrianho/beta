@@ -1,11 +1,24 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { api } from "./api.js";
+import AuthPage from "./AuthPage.jsx";
 import Dashboard from "./Dashboard.jsx";
 import ReviewPage from "./ReviewPage.jsx";
 
 export default function App() {
-  // Mock auth for now: a simple role toggle. Swap for real accounts later.
-  const [role, setRole] = useState("coach"); // "coach" | "student"
+  const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
   const [activeVideoId, setActiveVideoId] = useState(null);
+
+  useEffect(() => {
+    api.me().then(setUser);
+  }, []);
+
+  async function logout() {
+    await api.logout();
+    setUser(null);
+    setActiveVideoId(null);
+  }
+
+  if (user === undefined) return null;
 
   return (
     <div className="app">
@@ -13,29 +26,25 @@ export default function App() {
         <div className="brand" onClick={() => setActiveVideoId(null)}>
           🧗 Beta Coach
         </div>
-        <div className="role-toggle">
-          <button
-            className={role === "student" ? "active" : ""}
-            onClick={() => setRole("student")}
-          >
-            Student
-          </button>
-          <button
-            className={role === "coach" ? "active" : ""}
-            onClick={() => setRole("coach")}
-          >
-            Coach
-          </button>
-        </div>
+        {user && (
+          <div className="user-chip">
+            <span className="muted">
+              {user.name} · {user.role}
+            </span>
+            <button onClick={logout}>Sign out</button>
+          </div>
+        )}
       </header>
-      {activeVideoId ? (
+      {!user ? (
+        <AuthPage onAuthed={setUser} />
+      ) : activeVideoId ? (
         <ReviewPage
           videoId={activeVideoId}
-          role={role}
+          role={user.role}
           onBack={() => setActiveVideoId(null)}
         />
       ) : (
-        <Dashboard role={role} onOpen={setActiveVideoId} />
+        <Dashboard role={user.role} onOpen={setActiveVideoId} />
       )}
     </div>
   );

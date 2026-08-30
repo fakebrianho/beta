@@ -3,22 +3,32 @@ async function json(res) {
   return res.json();
 }
 
+const post = (url, body) =>
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(json);
+
 export const api = {
+  me: () => fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)),
+  signup: (data) => post("/api/auth/signup", data),
+  login: (data) => post("/api/auth/login", data),
+  logout: () => post("/api/auth/logout", {}),
+  magicLink: (data) => post("/api/auth/magic-link", data),
   listVideos: () => fetch("/api/videos").then(json),
   getVideo: (id) => fetch(`/api/videos/${id}`).then(json),
-  uploadVideo: (formData, onProgress) =>
-    new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/videos");
-      xhr.upload.onprogress = (e) =>
-        e.lengthComputable && onProgress?.(e.loaded / e.total);
-      xhr.onload = () =>
-        xhr.status < 300
-          ? resolve(JSON.parse(xhr.responseText))
-          : reject(new Error("Upload failed"));
-      xhr.onerror = () => reject(new Error("Upload failed"));
-      xhr.send(formData);
-    }),
+  // Upload goes browser → Vercel Blob (token minted by /api/blob/upload),
+  // then the video is registered with its blob URL.
+  uploadVideo: async ({ file, title, notes }, onProgress) => {
+    const { uploadPresigned } = await import("@vercel/blob/client");
+    const blob = await uploadPresigned(file.name, file, {
+      access: "public",
+      handleUploadUrl: "/api/blob/upload",
+      onUploadProgress: ({ percentage }) => onProgress?.(percentage / 100),
+    });
+    return post("/api/videos", { title, notes, url: blob.url });
+  },
   deleteVideo: (id) => fetch(`/api/videos/${id}`, { method: "DELETE" }).then(json),
   setStatus: (id, status) =>
     fetch(`/api/videos/${id}`, {

@@ -16,10 +16,14 @@ export default function Dashboard({ role, onOpen }) {
     e.preventDefault();
     setError("");
     const fd = new FormData(formRef.current);
-    if (!fd.get("video")?.name) return setError("Pick a video file first.");
+    const file = fd.get("video");
+    if (!file?.name) return setError("Pick a video file first.");
     try {
       setProgress(0);
-      await api.uploadVideo(fd, setProgress);
+      await api.uploadVideo(
+        { file, title: fd.get("title"), notes: fd.get("notes") },
+        setProgress
+      );
       formRef.current.reset();
       refresh();
     } catch (err) {
@@ -42,7 +46,6 @@ export default function Dashboard({ role, onOpen }) {
           <h2>Submit a climb</h2>
           <form ref={formRef} onSubmit={handleUpload}>
             <input name="title" placeholder="Title (e.g. V5 crimpy overhang attempt)" />
-            <input name="student" placeholder="Your name" />
             <textarea
               name="notes"
               rows={2}
