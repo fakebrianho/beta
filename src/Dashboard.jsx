@@ -3,6 +3,7 @@ import { api } from "./api.js";
 
 export default function Dashboard({ role, onOpen }) {
   const [videos, setVideos] = useState([]);
+  const [routes, setRoutes] = useState([]);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
   const formRef = useRef(null);
@@ -10,7 +11,14 @@ export default function Dashboard({ role, onOpen }) {
   const refresh = () => api.listVideos().then(setVideos).catch((e) => setError(e.message));
   useEffect(() => {
     refresh();
-  }, []);
+    if (role === "coach") api.listRoutes().then(setRoutes).catch(() => {});
+  }, [role]);
+
+  async function deleteRoute(id) {
+    if (!confirm("Delete this route and its send videos?")) return;
+    await api.deleteRoute(id);
+    setRoutes(routes.filter((r) => r.id !== id));
+  }
 
   async function handleUpload(e) {
     e.preventDefault();
@@ -94,6 +102,30 @@ export default function Dashboard({ role, onOpen }) {
           ))}
         </div>
       </section>
+
+      {role === "coach" && routes.length > 0 && (
+        <section className="route-admin">
+          <h2>Gallery routes</h2>
+          <div className="route-admin-list">
+            {routes.map((r) => (
+              <div key={r.id} className="route-admin-row">
+                <img src={r.imageUrl} alt="" />
+                <div className="route-admin-info">
+                  <strong>{r.title}</strong>
+                  <span className="muted">
+                    {r.grade} ·{" "}
+                    {r.status === "bounty" ? "💰 bounty" : `✓ FA by ${r.faBy}`} ·{" "}
+                    {r.sendCount} send{r.sendCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <button className="delete-btn" onClick={() => deleteRoute(r.id)}>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

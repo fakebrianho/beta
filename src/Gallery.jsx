@@ -27,13 +27,6 @@ export default function Gallery({ role }) {
     setOpenRoute(await api.getRoute(id));
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Delete this route and its send videos?")) return;
-    await api.deleteRoute(id);
-    setOpenRoute(null);
-    refresh();
-  }
-
   return (
     <main className="dashboard">
       <div className="gallery-head">
@@ -84,9 +77,7 @@ export default function Gallery({ role }) {
       {openRoute && (
         <RouteDetail
           route={openRoute}
-          role={role}
           onClose={() => setOpenRoute(null)}
-          onDelete={handleDelete}
           onChanged={async () => {
             await open(openRoute.id);
             refresh();
@@ -152,7 +143,7 @@ function AddRouteModal({ onClose, onAdded }) {
   );
 }
 
-function RouteDetail({ route, role, onClose, onDelete, onChanged }) {
+function RouteDetail({ route, onClose, onChanged }) {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
   const fileRef = useRef(null);
@@ -228,15 +219,6 @@ function RouteDetail({ route, role, onClose, onDelete, onChanged }) {
               </button>
             </form>
             {error && <p className="error">{error}</p>}
-
-            {role === "coach" && (
-              <button
-                className="delete-route"
-                onClick={() => onDelete(route.id)}
-              >
-                Delete route
-              </button>
-            )}
           </div>
         </div>
       </div>

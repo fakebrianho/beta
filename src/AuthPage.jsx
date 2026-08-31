@@ -3,7 +3,6 @@ import { api } from "./api.js";
 
 export default function AuthPage({ onAuthed }) {
   const [mode, setMode] = useState("login"); // "login" | "signup" | "magic"
-  const [role, setRole] = useState("student");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [magicSent, setMagicSent] = useState(null); // { dev } after a link is sent
@@ -24,14 +23,12 @@ export default function AuthPage({ onAuthed }) {
     try {
       if (mode === "magic") {
         const res = await api.magicLink(
-          needsProfile ? { ...data, role } : { email: data.email }
+          needsProfile ? data : { email: data.email }
         );
         setMagicSent(res);
       } else {
         const user =
-          mode === "signup"
-            ? await api.signup({ ...data, role })
-            : await api.login(data);
+          mode === "signup" ? await api.signup(data) : await api.login(data);
         onAuthed(user);
       }
     } catch (err) {
@@ -77,22 +74,6 @@ export default function AuthPage({ onAuthed }) {
                   </p>
                 )}
                 <input name="name" placeholder="Your name" required />
-                <div className="role-toggle auth-role">
-                  <button
-                    type="button"
-                    className={role === "student" ? "active" : ""}
-                    onClick={() => setRole("student")}
-                  >
-                    I'm a student
-                  </button>
-                  <button
-                    type="button"
-                    className={role === "coach" ? "active" : ""}
-                    onClick={() => setRole("coach")}
-                  >
-                    I'm a coach
-                  </button>
-                </div>
               </>
             )}
             <input

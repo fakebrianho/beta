@@ -19,6 +19,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 const COOKIE = "bc_token";
 
+// Only these emails become coaches; everyone else signs up as a student
+const COACH_EMAILS = (process.env.COACH_EMAILS || "bh1525@nyu.edu")
+  .toLowerCase()
+  .split(",")
+  .map((s) => s.trim());
+const roleFor = (email) =>
+  COACH_EMAILS.includes(email.toLowerCase()) ? "coach" : "student";
+
 // Cached connection so serverless invocations reuse it
 let dbPromise = null;
 export function ensureDb() {
@@ -64,7 +72,7 @@ async function requireAuth(req, res, next) {
 }
 
 app.post("/api/auth/signup", async (req, res) => {
-  const { email, name, password, role } = req.body;
+  const { email, name, password } = req.body;
   if (!email || !name || !password)
     return res.status(400).json({ error: "Email, name and password required" });
   if (password.length < 6)
@@ -75,7 +83,7 @@ app.post("/api/auth/signup", async (req, res) => {
     email,
     name,
     passwordHash: await bcrypt.hash(password, 10),
-    role: role === "coach" ? "coach" : "student",
+    role: roleFor(email),
   });
   setSession(res, user);
   res.status(201).json(user);
@@ -169,13 +177,13 @@ function appUrl(req) {
 }
 
 app.post("/api/auth/magic-link", async (req, res) => {
-  const { email, name, role } = req.body;
+  const { email, name } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (!existing && !name)
     return res.status(404).json({ error: "new-user" }); // client then asks for name/role
   const token = jwt.sign(
-    { magic: true, email: email.toLowerCase(), name, role },
+    { magic: true, email: email.toLowerCase(), name },
     JWT_SECRET,
     { expiresIn: "15m" }
   );
@@ -197,7 +205,7 @@ app.get("/api/auth/magic", async (req, res) => {
       user = await User.create({
         email: payload.email,
         name: payload.name || payload.email.split("@")[0],
-        role: payload.role === "coach" ? "coach" : "student",
+        role: roleFor(payload.email),
       });
     setSession(res, user);
     res.redirect("/");
