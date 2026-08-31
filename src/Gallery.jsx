@@ -1,6 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 
+// Browsers can't render HEIC (iPhone photos) — convert to JPEG before upload
+async function toDisplayableImage(file) {
+  if (!/\.hei[cf]$/i.test(file.name) && !/hei[cf]/.test(file.type)) return file;
+  const { default: heic2any } = await import("heic2any");
+  const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+  return new File([blob], file.name.replace(/\.hei[cf]$/i, ".jpg"), {
+    type: "image/jpeg",
+  });
+}
+
 export default function Gallery({ role }) {
   const [routes, setRoutes] = useState([]);
   const [openRoute, setOpenRoute] = useState(null); // full route with sends
@@ -100,7 +110,10 @@ function AddRouteModal({ onClose, onAdded }) {
     if (!image?.name) return setError("Pick a hero image first.");
     try {
       setProgress(0);
-      const imageUrl = await api.uploadFile(image, setProgress);
+      const imageUrl = await api.uploadFile(
+        await toDisplayableImage(image),
+        setProgress
+      );
       await api.addRoute({
         title: fd.get("title"),
         grade: fd.get("grade"),
