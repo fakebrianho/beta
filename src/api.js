@@ -32,6 +32,7 @@ export const api = {
     const url = await api.uploadFile(file, onProgress);
     return post("/api/videos", { title, notes, url });
   },
+  convertImage: (url) => post("/api/convert-image", { url }),
   // Gallery
   listRoutes: () => fetch("/api/routes").then(json),
   getRoute: (id) => fetch(`/api/routes/${id}`).then(json),

@@ -306,6 +306,34 @@ app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Convert an already-uploaded HEIC blob to JPEG (browsers can't render HEIC
+// and client-side wasm decoders choke on many iPhone variants). The client
+// uploads the original to Blob first, then asks us to swap it for a JPEG.
+app.post("/api/convert-image", requireAuth, async (req, res) => {
+  const { url } = req.body;
+  if (!url?.includes(".blob.vercel-storage.com/"))
+    return res.status(400).json({ error: "Not a blob URL" });
+  try {
+    const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
+    // ftyp brand check: only convert actual HEIF containers
+    const brand = buf.slice(8, 12).toString();
+    if (buf.slice(4, 8).toString() !== "ftyp" || !/^(heic|heix|hevc|mif1|msf1|heim|heis)/.test(brand))
+      return res.json({ url }); // not HEIC — use as-is
+    const { default: heicConvert } = await import("heic-convert");
+    const jpeg = await heicConvert({ buffer: buf, format: "JPEG", quality: 0.85 });
+    const { put } = await import("@vercel/blob");
+    const out = await put(
+      url.split("/").pop().replace(/\.[^.]+$/, "") + ".jpg",
+      Buffer.from(jpeg),
+      { access: "public", addRandomSuffix: true, contentType: "image/jpeg" }
+    );
+    await del(url).catch(() => {});
+    res.json({ url: out.url });
+  } catch (e) {
+    res.status(422).json({ error: "Couldn't convert this image — try exporting it as JPEG first." });
+  }
+});
+
 // ---- Gallery routes (shared across all users) ----
 app.get("/api/routes", requireAuth, async (req, res) => {
   const routes = await Route.find().sort({ createdAt: -1 });
