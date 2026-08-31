@@ -34,6 +34,33 @@ const commentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Gallery routes: a problem someone set/found, open as a "bounty" until the
+// first ascent video flips it to "fa"
+const routeSchema = new mongoose.Schema(
+  {
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    title: { type: String, required: true },
+    grade: { type: String, default: "?" }, // proposed/suggested grade
+    imageUrl: { type: String, required: true }, // vertical hero image (Blob URL)
+    notes: { type: String, default: "" },
+    status: { type: String, enum: ["bounty", "fa"], default: "bounty" },
+    faBy: { type: String, default: null }, // name of first ascensionist
+    faAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+
+// A send: proof video of someone doing a gallery route
+const sendSchema = new mongoose.Schema(
+  {
+    route: { type: mongoose.Schema.Types.ObjectId, ref: "Route", required: true, index: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    author: String,
+    videoUrl: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
 // Serve the same shape the client already expects (id, url, createdAt)
 const clean = (schema) =>
   schema.set("toJSON", {
@@ -51,7 +78,11 @@ const clean = (schema) =>
 clean(userSchema);
 clean(videoSchema);
 clean(commentSchema);
+clean(routeSchema);
+clean(sendSchema);
 
 export const User = mongoose.model("User", userSchema);
 export const Video = mongoose.model("Video", videoSchema);
 export const Comment = mongoose.model("Comment", commentSchema);
+export const Route = mongoose.model("Route", routeSchema);
+export const Send = mongoose.model("Send", sendSchema);

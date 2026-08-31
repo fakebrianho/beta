@@ -12,7 +12,7 @@ import jwt from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import { handleUploadPresigned } from "@vercel/blob/client";
 import { del, issueSignedToken } from "@vercel/blob";
-import { User, Video, Comment } from "./models.js";
+import { User, Video, Comment, Route, Send } from "./models.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -105,9 +105,9 @@ app.get("/api/auth/me", requireAuth, (req, res) => res.json(req.user));
 // The link carries a short-lived JWT. Sent via Brevo (BREVO_API_KEY +
 // MAIL_FROM, a sender address verified in Brevo). Falls back to Resend
 // (RESEND_API_KEY), then to printing the link in the server console (dev).
-const MAGIC_SUBJECT = "Your Beta Coach sign-in link";
+const MAGIC_SUBJECT = "Your Beta sign-in link";
 const magicHtml = (link) =>
-  `<p>Click to sign in to Beta Coach:</p><p><a href="${link}">Sign in</a></p><p>This link expires in 15 minutes.</p>`;
+  `<p>Click to sign in to Beta:</p><p><a href="${link}">Sign in</a></p><p>This link expires in 15 minutes.</p>`;
 
 async function sendMagicEmail(email, link) {
   if (process.env.BREVO_API_KEY) {
@@ -115,8 +115,8 @@ async function sendMagicEmail(email, link) {
     const raw = process.env.MAIL_FROM || "";
     const m = raw.match(/^(.*)<(.+)>$/);
     const sender = m
-      ? { name: m[1].trim() || "Beta Coach", email: m[2].trim() }
-      : { name: "Beta Coach", email: raw.trim() };
+      ? { name: m[1].trim() || "Beta", email: m[2].trim() }
+      : { name: "Beta", email: raw.trim() };
     if (!sender.email) throw new Error("Set MAIL_FROM to your verified Brevo sender");
     const r = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -145,7 +145,7 @@ async function sendMagicEmail(email, link) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env.MAIL_FROM || "Beta Coach <onboarding@resend.dev>",
+        from: process.env.MAIL_FROM || "Beta <onboarding@resend.dev>",
         to: email,
         subject: MAGIC_SUBJECT,
         html: magicHtml(link),
@@ -296,6 +296,76 @@ app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
   if (req.video.url?.startsWith("https://"))
     await del(req.video.url).catch(() => {});
   res.json({ ok: true });
+});
+
+// ---- Gallery routes (shared across all users) ----
+app.get("/api/routes", requireAuth, async (req, res) => {
+  const routes = await Route.find().sort({ createdAt: -1 });
+  const counts = await Send.aggregate([
+    { $match: { route: { $in: routes.map((r) => r._id) } } },
+    { $group: { _id: "$route", n: { $sum: 1 } } },
+  ]);
+  const byId = Object.fromEntries(counts.map((c) => [c._id.toString(), c.n]));
+  res.json(routes.map((r) => ({ ...r.toJSON(), sendCount: byId[r.id] || 0 })));
+});
+
+app.post("/api/routes", requireAuth, async (req, res) => {
+  if (req.user.role !== "coach")
+    return res.status(403).json({ error: "Only coaches can add routes" });
+  const { title, grade, imageUrl, notes } = req.body;
+  if (!title || !imageUrl)
+    return res.status(400).json({ error: "Need a title and an image" });
+  const route = await Route.create({
+    owner: req.user.id,
+    title,
+    grade: grade || "?",
+    imageUrl,
+    notes: notes || "",
+  });
+  res.status(201).json(route);
+});
+
+app.get("/api/routes/:id", requireAuth, async (req, res) => {
+  const route = await Route.findById(req.params.id).catch(() => null);
+  if (!route) return res.status(404).json({ error: "Not found" });
+  const sends = await Send.find({ route: route.id }).sort({ createdAt: 1 });
+  res.json({ ...route.toJSON(), sends });
+});
+
+app.delete("/api/routes/:id", requireAuth, async (req, res) => {
+  if (req.user.role !== "coach")
+    return res.status(403).json({ error: "Only coaches can delete routes" });
+  const route = await Route.findById(req.params.id).catch(() => null);
+  if (!route) return res.status(404).json({ error: "Not found" });
+  const sends = await Send.find({ route: route.id });
+  await Send.deleteMany({ route: route.id });
+  await route.deleteOne();
+  for (const u of [route.imageUrl, ...sends.map((s) => s.videoUrl)])
+    if (u?.startsWith("https://")) await del(u).catch(() => {});
+  res.json({ ok: true });
+});
+
+// Submit a send video; the first send claims the FA and flips the bounty
+app.post("/api/routes/:id/sends", requireAuth, async (req, res) => {
+  const route = await Route.findById(req.params.id).catch(() => null);
+  if (!route) return res.status(404).json({ error: "Not found" });
+  const { videoUrl } = req.body;
+  if (!videoUrl) return res.status(400).json({ error: "No video URL" });
+  const send = await Send.create({
+    route: route.id,
+    user: req.user.id,
+    author: req.user.name,
+    videoUrl,
+  });
+  let claimedFa = false;
+  if (route.status === "bounty") {
+    route.status = "fa";
+    route.faBy = req.user.name;
+    route.faAt = new Date();
+    await route.save();
+    claimedFa = true;
+  }
+  res.status(201).json({ send, route, claimedFa });
 });
 
 // ---- Comments (timestamped, optional drawing payload) ----

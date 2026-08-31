@@ -18,17 +18,26 @@ export const api = {
   magicLink: (data) => post("/api/auth/magic-link", data),
   listVideos: () => fetch("/api/videos").then(json),
   getVideo: (id) => fetch(`/api/videos/${id}`).then(json),
-  // Upload goes browser → Vercel Blob (token minted by /api/blob/upload),
-  // then the video is registered with its blob URL.
-  uploadVideo: async ({ file, title, notes }, onProgress) => {
+  // Browser → Vercel Blob directly (presigned PUT minted by /api/blob/upload)
+  uploadFile: async (file, onProgress) => {
     const { uploadPresigned } = await import("@vercel/blob/client");
     const blob = await uploadPresigned(file.name, file, {
       access: "public",
       handleUploadUrl: "/api/blob/upload",
       onUploadProgress: ({ percentage }) => onProgress?.(percentage / 100),
     });
-    return post("/api/videos", { title, notes, url: blob.url });
+    return blob.url;
   },
+  uploadVideo: async ({ file, title, notes }, onProgress) => {
+    const url = await api.uploadFile(file, onProgress);
+    return post("/api/videos", { title, notes, url });
+  },
+  // Gallery
+  listRoutes: () => fetch("/api/routes").then(json),
+  getRoute: (id) => fetch(`/api/routes/${id}`).then(json),
+  addRoute: (data) => post("/api/routes", data),
+  deleteRoute: (id) => fetch(`/api/routes/${id}`, { method: "DELETE" }).then(json),
+  addSend: (routeId, videoUrl) => post(`/api/routes/${routeId}/sends`, { videoUrl }),
   deleteVideo: (id) => fetch(`/api/videos/${id}`, { method: "DELETE" }).then(json),
   setStatus: (id, status) =>
     fetch(`/api/videos/${id}`, {
