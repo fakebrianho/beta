@@ -320,13 +320,14 @@ app.get("/api/routes", requireAuth, async (req, res) => {
 app.post("/api/routes", requireAuth, async (req, res) => {
   if (req.user.role !== "coach")
     return res.status(403).json({ error: "Only coaches can add routes" });
-  const { title, grade, imageUrl, notes } = req.body;
+  const { title, grade, imageUrl, notes, match } = req.body;
   if (!title || !imageUrl)
     return res.status(400).json({ error: "Need a title and an image" });
   const route = await Route.create({
     owner: req.user.id,
     title,
     grade: grade || "?",
+    match: !!match,
     imageUrl,
     notes: notes || "",
   });

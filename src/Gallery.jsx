@@ -47,7 +47,9 @@ export default function Gallery({ role }) {
           <div key={r.id} className="route-card" onClick={() => open(r.id)}>
             <img src={r.imageUrl} alt={r.title} loading="lazy" />
             <div className="route-card-overlay">
-              <strong>{r.title}</strong>
+              <strong>
+                {r.title} · {r.match ? "match" : "no match"}
+              </strong>
               <div className="badges">
                 <span className="badge grade">{r.grade}</span>
                 {r.status === "bounty" ? (
@@ -108,6 +110,7 @@ function AddRouteModal({ onClose, onAdded }) {
       await api.addRoute({
         title: fd.get("title"),
         grade: fd.get("grade"),
+        match: fd.get("match") === "on",
         notes: fd.get("notes"),
         imageUrl,
       });
@@ -126,6 +129,10 @@ function AddRouteModal({ onClose, onAdded }) {
         <form ref={formRef} onSubmit={submit}>
           <input name="title" placeholder="Route name" required />
           <input name="grade" placeholder="Proposed grade (e.g. V6)" />
+          <label className="check-label">
+            <input name="match" type="checkbox" defaultChecked />
+            Matching allowed
+          </label>
           <textarea name="notes" rows={2} placeholder="Beta / description (optional)" />
           <label className="muted">
             Hero image (vertical works best)
@@ -174,7 +181,9 @@ function RouteDetail({ route, onClose, onChanged }) {
         <div className="route-detail-layout">
           <img className="route-hero" src={route.imageUrl} alt={route.title} />
           <div className="route-info">
-            <h3>{route.title}</h3>
+            <h3>
+              {route.title} · {route.match ? "match" : "no match"}
+            </h3>
             <div className="badges">
               <span className="badge grade">{route.grade}</span>
               {route.status === "bounty" ? (

@@ -206,6 +206,14 @@ input, textarea, select {
 .send { display: flex; flex-direction: column; gap: 2px; }
 .send-form { display: flex; flex-direction: column; gap: 8px; }
 .send-form button { background: var(--accent); align-self: flex-start; }
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.check-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
 .route-admin { margin-top: 28px; }
 .route-admin-list { display: flex; flex-direction: column; gap: 8px; }
 .route-admin-row {
