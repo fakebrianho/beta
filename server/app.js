@@ -27,6 +27,12 @@ const COACH_EMAILS = (process.env.COACH_EMAILS || "bh1525@nyu.edu")
 const roleFor = (email) =>
   COACH_EMAILS.includes(email.toLowerCase()) ? "coach" : "student";
 
+// Simple shared passcode gating anonymous gallery sends (and their uploads)
+const SEND_PASSCODE = process.env.SEND_PASSCODE || "sendit";
+const passcodeOk = (p) =>
+  typeof p === "string" &&
+  p.trim().toLowerCase() === SEND_PASSCODE.toLowerCase();
+
 // Cached connection so serverless invocations reuse it
 let dbPromise = null;
 export function ensureDb() {
@@ -58,6 +64,16 @@ function setSession(res, user) {
     secure: process.env.NODE_ENV === "production" || !!process.env.VERCEL,
     maxAge: 30 * 24 * 3600 * 1000,
   });
+}
+
+// Session user if present, else null (for routes open to passcode holders)
+async function userFromReq(req) {
+  try {
+    const { id } = jwt.verify(req.cookies[COOKIE], JWT_SECRET);
+    return await User.findById(id);
+  } catch {
+    return null;
+  }
 }
 
 async function requireAuth(req, res, next) {
@@ -220,26 +236,35 @@ app.get("/api/auth/magic", async (req, res) => {
 // serverless body limit). Presigned flow: works with OIDC auth (BLOB_STORE_ID
 // + VERCEL_OIDC_TOKEN), no static read-write token needed. The client gets a
 // presigned PUT URL here, uploads to Blob, then registers the video via
-// POST /api/videos with the blob URL. No auth: anonymous visitors can
-// submit gallery sends, so uploads are open (size-capped).
+// POST /api/videos with the blob URL. Allowed for signed-in users, or for
+// anonymous gallery senders who supply the shared passcode (clientPayload).
 app.post("/api/blob/upload", async (req, res) => {
   try {
     const jsonResponse = await handleUploadPresigned({
       body: req.body,
       request: req,
-      getSignedToken: async (pathname) => ({
-        token: await issueSignedToken({
-          pathname,
-          operations: ["put"],
-          maximumSizeInBytes: 200 * 1024 * 1024,
-          validUntil: Date.now() + 60 * 60 * 1000,
-        }),
-        urlOptions: {
-          maximumSizeInBytes: 200 * 1024 * 1024,
-          addRandomSuffix: true,
-          allowOverwrite: false,
-        },
-      }),
+      getSignedToken: async (pathname, clientPayload) => {
+        if (!(await userFromReq(req))) {
+          let passcode;
+          try {
+            passcode = JSON.parse(clientPayload || "{}").passcode;
+          } catch {}
+          if (!passcodeOk(passcode)) throw new Error("Wrong passcode");
+        }
+        return {
+          token: await issueSignedToken({
+            pathname,
+            operations: ["put"],
+            maximumSizeInBytes: 200 * 1024 * 1024,
+            validUntil: Date.now() + 60 * 60 * 1000,
+          }),
+          urlOptions: {
+            maximumSizeInBytes: 200 * 1024 * 1024,
+            addRandomSuffix: true,
+            allowOverwrite: false,
+          },
+        };
+      },
       onUploadCompleted: async () => {}, // registration happens via POST /api/videos
     });
     res.json(jsonResponse);
@@ -359,9 +384,11 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
 app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
-  const { videoUrl, author } = req.body;
+  const { videoUrl, author, passcode } = req.body;
   if (!videoUrl) return res.status(400).json({ error: "A send video is required" });
   if (!author?.trim()) return res.status(400).json({ error: "Add your name" });
+  if (!(await userFromReq(req)) && !passcodeOk(passcode))
+    return res.status(401).json({ error: "Wrong passcode — ask at the gym" });
   const send = await Send.create({
     route: route.id,
     author: author.trim(),

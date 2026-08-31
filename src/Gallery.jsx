@@ -114,6 +114,7 @@ export default function Gallery({ role }) {
       {openRoute && (
         <RouteDetail
           route={openRoute}
+          signedIn={role != null}
           onClose={() => setOpenRoute(null)}
           onChanged={async () => {
             await open(openRoute.id);
@@ -185,7 +186,7 @@ function AddRouteModal({ onClose, onAdded }) {
   );
 }
 
-function RouteDetail({ route, onClose, onChanged }) {
+function RouteDetail({ route, signedIn, onClose, onChanged }) {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
   const formRef = useRef(null);
@@ -195,13 +196,18 @@ function RouteDetail({ route, onClose, onChanged }) {
     const fd = new FormData(formRef.current);
     const file = fd.get("video");
     const author = (fd.get("author") || "").trim();
+    const passcode = (fd.get("passcode") || "").trim();
     if (!file?.name) return setError("A send video is required.");
     if (!author) return setError("Add your name.");
     setError("");
     try {
       setProgress(0);
-      const videoUrl = await api.uploadFile(file, setProgress);
-      const { claimedFa } = await api.addSend(route.id, { videoUrl, author });
+      const videoUrl = await api.uploadFile(file, setProgress, passcode);
+      const { claimedFa } = await api.addSend(route.id, {
+        videoUrl,
+        author,
+        passcode,
+      });
       if (claimedFa) alert("🎉 First ascent! The bounty is yours.");
       formRef.current.reset();
       onChanged();
@@ -254,6 +260,14 @@ function RouteDetail({ route, onClose, onChanged }) {
 
             <form className="send-form" ref={formRef} onSubmit={submitSend}>
               <input name="author" placeholder="Your name" required />
+              {!signedIn && (
+                <input
+                  name="passcode"
+                  placeholder="Gym passcode"
+                  autoComplete="off"
+                  required
+                />
+              )}
               <label className="muted">
                 Did it? Upload your send video (required):
                 <input name="video" type="file" accept="video/*" required />
