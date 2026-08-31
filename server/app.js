@@ -220,14 +220,14 @@ app.get("/api/auth/magic", async (req, res) => {
 // serverless body limit). Presigned flow: works with OIDC auth (BLOB_STORE_ID
 // + VERCEL_OIDC_TOKEN), no static read-write token needed. The client gets a
 // presigned PUT URL here, uploads to Blob, then registers the video via
-// POST /api/videos with the blob URL.
-app.post("/api/blob/upload", requireAuth, async (req, res) => {
+// POST /api/videos with the blob URL. No auth: anonymous visitors can
+// submit gallery sends, so uploads are open (size-capped).
+app.post("/api/blob/upload", async (req, res) => {
   try {
     const jsonResponse = await handleUploadPresigned({
       body: req.body,
       request: req,
       getSignedToken: async (pathname) => ({
-        // requireAuth already verified the user above
         token: await issueSignedToken({
           pathname,
           operations: ["put"],
@@ -306,8 +306,8 @@ app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- Gallery routes (shared across all users) ----
-app.get("/api/routes", requireAuth, async (req, res) => {
+// ---- Gallery routes (public: no sign-in needed to browse or submit sends) ----
+app.get("/api/routes", async (req, res) => {
   const routes = await Route.find().sort({ createdAt: -1 });
   const counts = await Send.aggregate([
     { $match: { route: { $in: routes.map((r) => r._id) } } },
@@ -334,7 +334,7 @@ app.post("/api/routes", requireAuth, async (req, res) => {
   res.status(201).json(route);
 });
 
-app.get("/api/routes/:id", requireAuth, async (req, res) => {
+app.get("/api/routes/:id", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
   const sends = await Send.find({ route: route.id }).sort({ createdAt: 1 });
@@ -354,22 +354,23 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// Submit a send video; the first send claims the FA and flips the bounty
-app.post("/api/routes/:id/sends", requireAuth, async (req, res) => {
+// Submit a send: a typed name + video, not tied to an account.
+// The first send claims the FA and flips the bounty.
+app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
-  const { videoUrl } = req.body;
-  if (!videoUrl) return res.status(400).json({ error: "No video URL" });
+  const { videoUrl, author } = req.body;
+  if (!videoUrl) return res.status(400).json({ error: "A send video is required" });
+  if (!author?.trim()) return res.status(400).json({ error: "Add your name" });
   const send = await Send.create({
     route: route.id,
-    user: req.user.id,
-    author: req.user.name,
+    author: author.trim(),
     videoUrl,
   });
   let claimedFa = false;
   if (route.status === "bounty") {
     route.status = "fa";
-    route.faBy = req.user.name;
+    route.faBy = send.author;
     route.faAt = new Date();
     await route.save();
     claimedFa = true;

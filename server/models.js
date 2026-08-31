@@ -55,8 +55,8 @@ const routeSchema = new mongoose.Schema(
 const sendSchema = new mongoose.Schema(
   {
     route: { type: mongoose.Schema.Types.ObjectId, ref: "Route", required: true, index: true },
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    author: String,
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }, // sends aren't tied to accounts
+    author: { type: String, required: true },
     videoUrl: { type: String, required: true },
   },
   { timestamps: true }

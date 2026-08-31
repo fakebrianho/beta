@@ -8,73 +8,86 @@ import Gallery from "./Gallery.jsx";
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
   const [activeVideoId, setActiveVideoId] = useState(null);
-  const [tab, setTab] = useState("dashboard"); // "dashboard" | "gallery"
+  // Signed out: gallery is public, dashboard requires sign-in
+  const [tab, setTab] = useState("gallery"); // "dashboard" | "gallery"
+  const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
-    api.me().then(setUser);
+    api.me().then((u) => {
+      setUser(u);
+      if (u) setTab("dashboard");
+    });
   }, []);
 
   async function logout() {
     await api.logout();
     setUser(null);
     setActiveVideoId(null);
+    setTab("gallery");
   }
 
   if (user === undefined) return null;
+
+  const goTo = (t) => {
+    setActiveVideoId(null);
+    setShowAuth(false);
+    setTab(t);
+  };
 
   return (
     <div className="app">
       <header className="topbar">
         <div
           className="brand"
-          onClick={() => {
-            setActiveVideoId(null);
-            setTab("dashboard");
-          }}
+          onClick={() => goTo(user ? "dashboard" : "gallery")}
         >
           🧗 Beta
         </div>
-        {user && (
-          <nav className="role-toggle tabs">
+        <nav className="role-toggle tabs">
+          {user && (
             <button
               className={tab === "dashboard" && !activeVideoId ? "active" : ""}
-              onClick={() => {
-                setActiveVideoId(null);
-                setTab("dashboard");
-              }}
+              onClick={() => goTo("dashboard")}
             >
               Dashboard
             </button>
-            <button
-              className={tab === "gallery" && !activeVideoId ? "active" : ""}
-              onClick={() => {
-                setActiveVideoId(null);
-                setTab("gallery");
-              }}
-            >
-              Gallery
-            </button>
-          </nav>
-        )}
-        {user && (
+          )}
+          <button
+            className={
+              tab === "gallery" && !activeVideoId && !showAuth ? "active" : ""
+            }
+            onClick={() => goTo("gallery")}
+          >
+            Gallery
+          </button>
+        </nav>
+        {user ? (
           <div className="user-chip">
             <span className="muted">
               {user.name} · {user.role}
             </span>
             <button onClick={logout}>Sign out</button>
           </div>
+        ) : (
+          <button onClick={() => setShowAuth(true)}>Sign in</button>
         )}
       </header>
-      {!user ? (
-        <AuthPage onAuthed={setUser} />
-      ) : activeVideoId ? (
+      {!user && showAuth ? (
+        <AuthPage
+          onAuthed={(u) => {
+            setUser(u);
+            setShowAuth(false);
+            setTab("dashboard");
+          }}
+        />
+      ) : user && activeVideoId ? (
         <ReviewPage
           videoId={activeVideoId}
           role={user.role}
           onBack={() => setActiveVideoId(null)}
         />
       ) : tab === "gallery" ? (
-        <Gallery role={user.role} />
+        <Gallery role={user?.role || null} />
       ) : (
         <Dashboard role={user.role} onOpen={setActiveVideoId} />
       )}

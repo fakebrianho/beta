@@ -188,19 +188,22 @@ function AddRouteModal({ onClose, onAdded }) {
 function RouteDetail({ route, onClose, onChanged }) {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
-  const fileRef = useRef(null);
+  const formRef = useRef(null);
 
   async function submitSend(e) {
     e.preventDefault();
-    const file = fileRef.current?.files?.[0];
-    if (!file) return setError("Pick your send video first.");
+    const fd = new FormData(formRef.current);
+    const file = fd.get("video");
+    const author = (fd.get("author") || "").trim();
+    if (!file?.name) return setError("A send video is required.");
+    if (!author) return setError("Add your name.");
     setError("");
     try {
       setProgress(0);
       const videoUrl = await api.uploadFile(file, setProgress);
-      const { claimedFa } = await api.addSend(route.id, videoUrl);
+      const { claimedFa } = await api.addSend(route.id, { videoUrl, author });
       if (claimedFa) alert("🎉 First ascent! The bounty is yours.");
-      fileRef.current.value = "";
+      formRef.current.reset();
       onChanged();
     } catch (err) {
       setError(err.message);
@@ -249,10 +252,11 @@ function RouteDetail({ route, onClose, onChanged }) {
               ))}
             </div>
 
-            <form className="send-form" onSubmit={submitSend}>
+            <form className="send-form" ref={formRef} onSubmit={submitSend}>
+              <input name="author" placeholder="Your name" required />
               <label className="muted">
-                Did it? Upload your send video:
-                <input ref={fileRef} type="file" accept="video/*" />
+                Did it? Upload your send video (required):
+                <input name="video" type="file" accept="video/*" required />
               </label>
               <button type="submit" disabled={progress !== null}>
                 {progress !== null
