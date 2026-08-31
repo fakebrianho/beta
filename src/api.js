@@ -38,6 +38,7 @@ export const api = {
   getRoute: (id) => fetch(`/api/routes/${id}`).then(json),
   addRoute: (data) => post("/api/routes", data),
   deleteRoute: (id) => fetch(`/api/routes/${id}`, { method: "DELETE" }).then(json),
+  checkPasscode: (passcode) => post("/api/check-passcode", { passcode }),
   addSend: (routeId, { videoUrl, author, passcode }) =>
     post(`/api/routes/${routeId}/sends`, { videoUrl, author, passcode }),
   deleteVideo: (id) => fetch(`/api/videos/${id}`, { method: "DELETE" }).then(json),

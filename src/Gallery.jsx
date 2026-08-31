@@ -201,6 +201,7 @@ function RouteDetail({ route, signedIn, onClose, onChanged }) {
     if (!author) return setError("Add your name.");
     setError("");
     try {
+      await api.checkPasscode(passcode); // fail fast before the big upload
       setProgress(0);
       const videoUrl = await api.uploadFile(file, setProgress, passcode);
       const { claimedFa } = await api.addSend(route.id, {

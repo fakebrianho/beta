@@ -236,6 +236,14 @@ app.get("/api/auth/magic", async (req, res) => {
 // serverless body limit). Presigned flow: works with OIDC auth (BLOB_STORE_ID
 // + VERCEL_OIDC_TOKEN), no static read-write token needed. The client gets a
 // presigned PUT URL here, uploads to Blob, then registers the video via
+// Cheap pre-check so the send form can reject a bad passcode with a clear
+// message before spending time uploading the video
+app.post("/api/check-passcode", async (req, res) => {
+  if ((await userFromReq(req)) || passcodeOk(req.body.passcode))
+    return res.json({ ok: true });
+  res.status(401).json({ error: "Wrong passcode — ask at the gym" });
+});
+
 // POST /api/videos with the blob URL. Allowed for signed-in users, or for
 // anonymous gallery senders who supply the shared passcode (clientPayload).
 app.post("/api/blob/upload", async (req, res) => {
