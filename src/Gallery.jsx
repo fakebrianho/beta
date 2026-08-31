@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 
+// Browsers can't render HEIC (iPhone photos) — re-encode to JPEG before
+// upload. Prefer the browser's native decoder (Safari reads HEIC directly,
+// and this also downscales huge photos); fall back to heic2any's libheif.
 const MAX_DIM = 2000;
 
 async function encodeJpeg(source, name) {
@@ -18,18 +21,28 @@ async function encodeJpeg(source, name) {
   });
 }
 
-// Upload an image, ending up with a browser-displayable JPEG URL.
-// Native decode+downscale when the browser can read the file; otherwise
-// upload the original and let the server convert it (handles all HEICs).
-async function uploadImage(file, onProgress) {
+async function toDisplayableImage(file) {
+  // Native decode first — works for jpg/png everywhere and HEIC on Safari
   try {
     const bmp = await createImageBitmap(file);
     const out = await encodeJpeg(bmp, file.name);
     bmp.close();
-    return api.uploadFile(out, onProgress);
+    return out;
   } catch {
-    const url = await api.uploadFile(file, onProgress);
-    return (await api.convertImage(url)).url;
+    /* browser can't decode this format */
+  }
+  try {
+    const { default: heic2any } = await import("heic2any");
+    let blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+    if (Array.isArray(blob)) blob = blob[0]; // multi-image HEIC (e.g. bursts)
+    const bmp = await createImageBitmap(blob);
+    const out = await encodeJpeg(bmp, file.name);
+    bmp.close();
+    return out;
+  } catch {
+    throw new Error(
+      "Couldn't read this image. Try exporting it as JPEG or PNG first (on iPhone: Settings → Camera → Formats → Most Compatible, or share via Photos which converts automatically)."
+    );
   }
 }
 
@@ -125,7 +138,10 @@ function AddRouteModal({ onClose, onAdded }) {
     if (!image?.name) return setError("Pick a hero image first.");
     try {
       setProgress(0);
-      const imageUrl = await uploadImage(image, setProgress);
+      const imageUrl = await api.uploadFile(
+        await toDisplayableImage(image),
+        setProgress
+      );
       await api.addRoute({
         title: fd.get("title"),
         grade: fd.get("grade"),
