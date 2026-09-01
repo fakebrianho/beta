@@ -39,6 +39,12 @@ export const api = {
   getRoute: (id) => fetch(`/api/routes/${id}`).then(json),
   addRoute: (data) => post("/api/routes", data),
   deleteRoute: (id) => fetch(`/api/routes/${id}`, { method: "DELETE" }).then(json),
+  updateRoute: (id, data) =>
+    fetch(`/api/routes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json),
   checkPasscode: (passcode) => post("/api/check-passcode", { passcode }),
   addSend: (routeId, data) => post(`/api/routes/${routeId}/sends`, data),
   leaderboard: () => fetch("/api/leaderboard").then(json),

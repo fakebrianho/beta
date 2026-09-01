@@ -41,6 +41,7 @@ const routeSchema = new mongoose.Schema(
     owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     title: { type: String, required: true },
     grade: { type: String, default: "?" }, // proposed/suggested grade
+    gradeOverride: { type: String, default: null }, // coach's final say — beats the average
     match: { type: Boolean, default: true }, // matching holds allowed?
     imageUrl: { type: String, required: true }, // vertical hero image (Blob URL)
     notes: { type: String, default: "" },

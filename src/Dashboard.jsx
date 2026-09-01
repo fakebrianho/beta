@@ -14,6 +14,16 @@ export default function Dashboard({ role, onOpen }) {
     if (role === "coach") api.listRoutes().then(setRoutes).catch(() => {});
   }, [role]);
 
+  async function setGrade(r) {
+    const g = prompt(
+      `Final grade for "${r.title}" (e.g. V7).\nThis overrides the community average. Leave empty to go back to averaging.`,
+      r.gradeOverride || ""
+    );
+    if (g === null) return;
+    const updated = await api.updateRoute(r.id, { gradeOverride: g });
+    setRoutes(routes.map((x) => (x.id === r.id ? { ...x, ...updated } : x)));
+  }
+
   async function deleteRoute(id) {
     if (!confirm("Delete this route and its send videos?")) return;
     await api.deleteRoute(id);
@@ -113,11 +123,18 @@ export default function Dashboard({ role, onOpen }) {
                 <div className="route-admin-info">
                   <strong>{r.title}</strong>
                   <span className="muted">
-                    {r.grade} ·{" "}
+                    {r.displayGrade || r.grade}
+                    {r.gradeOverride && " (set by you)"} ·{" "}
                     {r.status === "bounty" ? "💰 bounty" : `✓ FA by ${r.faBy}`} ·{" "}
                     {r.sendCount} send{r.sendCount === 1 ? "" : "s"}
                   </span>
                 </div>
+                <button
+                  title="Set final grade"
+                  onClick={() => setGrade(r)}
+                >
+                  ✎ grade
+                </button>
                 <button className="delete-btn" onClick={() => deleteRoute(r.id)}>
                   ✕
                 </button>

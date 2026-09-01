@@ -354,6 +354,7 @@ app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
 // Shown grade = average of the setter's proposed grade (numeric part of the
 // string, e.g. "V6" → 6) and every grade submitted with a send.
 function displayGrade(route, sendGrades) {
+  if (route.gradeOverride) return route.gradeOverride; // coach has final say
   const m = (route.grade || "").match(/(\d+(?:\.\d+)?)/);
   const grades = [
     ...(m ? [Number(m[1])] : []),
@@ -404,6 +405,23 @@ app.get("/api/routes/:id", async (req, res) => {
   res.json({
     ...route.toJSON(),
     sends,
+    displayGrade: displayGrade(route, sends.map((s) => s.grade)),
+  });
+});
+
+// Coach edits: set/clear the final grade (empty string clears the override)
+app.patch("/api/routes/:id", requireAuth, async (req, res) => {
+  if (req.user.role !== "coach")
+    return res.status(403).json({ error: "Only coaches can edit routes" });
+  const route = await Route.findById(req.params.id).catch(() => null);
+  if (!route) return res.status(404).json({ error: "Not found" });
+  if ("gradeOverride" in req.body)
+    route.gradeOverride = req.body.gradeOverride?.trim() || null;
+  if (req.body.title) route.title = req.body.title;
+  await route.save();
+  const sends = await Send.find({ route: route.id });
+  res.json({
+    ...route.toJSON(),
     displayGrade: displayGrade(route, sends.map((s) => s.grade)),
   });
 });
