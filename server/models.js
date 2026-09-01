@@ -57,6 +57,7 @@ const sendSchema = new mongoose.Schema(
     route: { type: mongoose.Schema.Types.ObjectId, ref: "Route", required: true, index: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }, // sends aren't tied to accounts
     author: { type: String, required: true },
+    grade: { type: Number, min: 0, max: 17, default: null }, // sender's V-grade opinion
     videoUrl: { type: String, required: true },
   },
   { timestamps: true }

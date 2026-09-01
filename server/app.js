@@ -340,14 +340,34 @@ app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
 });
 
 // ---- Gallery routes (public: no sign-in needed to browse or submit sends) ----
+
+// Shown grade = average of the setter's proposed grade (numeric part of the
+// string, e.g. "V6" → 6) and every grade submitted with a send.
+function displayGrade(route, sendGrades) {
+  const m = (route.grade || "").match(/(\d+(?:\.\d+)?)/);
+  const grades = [
+    ...(m ? [Number(m[1])] : []),
+    ...sendGrades.filter((g) => typeof g === "number"),
+  ];
+  if (!grades.length) return route.grade || "?";
+  const avg = grades.reduce((a, b) => a + b, 0) / grades.length;
+  return `V${Math.round(avg * 2) / 2}`;
+}
+
 app.get("/api/routes", async (req, res) => {
   const routes = await Route.find().sort({ createdAt: -1 });
-  const counts = await Send.aggregate([
+  const stats = await Send.aggregate([
     { $match: { route: { $in: routes.map((r) => r._id) } } },
-    { $group: { _id: "$route", n: { $sum: 1 } } },
+    { $group: { _id: "$route", n: { $sum: 1 }, grades: { $push: "$grade" } } },
   ]);
-  const byId = Object.fromEntries(counts.map((c) => [c._id.toString(), c.n]));
-  res.json(routes.map((r) => ({ ...r.toJSON(), sendCount: byId[r.id] || 0 })));
+  const byId = Object.fromEntries(stats.map((s) => [s._id.toString(), s]));
+  res.json(
+    routes.map((r) => ({
+      ...r.toJSON(),
+      sendCount: byId[r.id]?.n || 0,
+      displayGrade: displayGrade(r, byId[r.id]?.grades || []),
+    }))
+  );
 });
 
 app.post("/api/routes", requireAuth, async (req, res) => {
@@ -371,7 +391,11 @@ app.get("/api/routes/:id", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
   const sends = await Send.find({ route: route.id }).sort({ createdAt: 1 });
-  res.json({ ...route.toJSON(), sends });
+  res.json({
+    ...route.toJSON(),
+    sends,
+    displayGrade: displayGrade(route, sends.map((s) => s.grade)),
+  });
 });
 
 app.delete("/api/routes/:id", requireAuth, async (req, res) => {
@@ -392,14 +416,19 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
 app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
-  const { videoUrl, author, passcode } = req.body;
+  const { videoUrl, author, passcode, grade } = req.body;
   if (!videoUrl) return res.status(400).json({ error: "A send video is required" });
-  if (!author?.trim()) return res.status(400).json({ error: "Add your name" });
-  if (!(await userFromReq(req)) && !passcodeOk(passcode))
+  const user = await userFromReq(req);
+  const name = user?.name || author?.trim(); // signed-in sends use the account name
+  if (!name) return res.status(400).json({ error: "Add your name" });
+  if (!user && !passcodeOk(passcode))
     return res.status(401).json({ error: "Wrong passcode — ask at the gym" });
+  const g = Number(grade);
   const send = await Send.create({
     route: route.id,
-    author: author.trim(),
+    user: user?.id || null,
+    author: name,
+    grade: Number.isFinite(g) && g >= 0 && g <= 17 ? g : null,
     videoUrl,
   });
   let claimedFa = false;

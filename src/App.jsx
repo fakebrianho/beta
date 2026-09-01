@@ -87,7 +87,7 @@ export default function App() {
           onBack={() => setActiveVideoId(null)}
         />
       ) : tab === "gallery" ? (
-        <Gallery role={user?.role || null} />
+        <Gallery user={user} />
       ) : (
         <Dashboard role={user.role} onOpen={setActiveVideoId} />
       )}

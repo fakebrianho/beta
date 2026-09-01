@@ -46,7 +46,8 @@ async function toDisplayableImage(file) {
   }
 }
 
-export default function Gallery({ role }) {
+export default function Gallery({ user }) {
+  const role = user?.role || null;
   const [routes, setRoutes] = useState([]);
   const [openRoute, setOpenRoute] = useState(null); // full route with sends
   const [adding, setAdding] = useState(false);
@@ -86,7 +87,7 @@ export default function Gallery({ role }) {
                 {r.title} · {r.match ? "match" : "no match"}
               </strong>
               <div className="badges">
-                <span className="badge grade">{r.grade}</span>
+                <span className="badge grade">{r.displayGrade || r.grade}</span>
                 {r.status === "bounty" ? (
                   <span className="badge bounty">💰 Bounty</span>
                 ) : (
@@ -114,7 +115,7 @@ export default function Gallery({ role }) {
       {openRoute && (
         <RouteDetail
           route={openRoute}
-          signedIn={role != null}
+          user={user}
           onClose={() => setOpenRoute(null)}
           onChanged={async () => {
             await open(openRoute.id);
@@ -186,7 +187,8 @@ function AddRouteModal({ onClose, onAdded }) {
   );
 }
 
-function RouteDetail({ route, signedIn, onClose, onChanged }) {
+function RouteDetail({ route, user, onClose, onChanged }) {
+  const signedIn = user != null;
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
   const formRef = useRef(null);
@@ -195,8 +197,9 @@ function RouteDetail({ route, signedIn, onClose, onChanged }) {
     e.preventDefault();
     const fd = new FormData(formRef.current);
     const file = fd.get("video");
-    const author = (fd.get("author") || "").trim();
+    const author = user?.name || (fd.get("author") || "").trim();
     const passcode = (fd.get("passcode") || "").trim();
+    const grade = fd.get("grade");
     if (!file?.name) return setError("A send video is required.");
     if (!author) return setError("Add your name.");
     setError("");
@@ -208,6 +211,7 @@ function RouteDetail({ route, signedIn, onClose, onChanged }) {
         videoUrl,
         author,
         passcode,
+        grade: grade === "" ? null : Number(grade),
       });
       if (claimedFa) alert("🎉 First ascent! The bounty is yours.");
       formRef.current.reset();
@@ -230,7 +234,9 @@ function RouteDetail({ route, signedIn, onClose, onChanged }) {
               {route.title} · {route.match ? "match" : "no match"}
             </h3>
             <div className="badges">
-              <span className="badge grade">{route.grade}</span>
+              <span className="badge grade" title={`Proposed: ${route.grade}`}>
+                {route.displayGrade || route.grade}
+              </span>
               {route.status === "bounty" ? (
                 <span className="badge bounty">💰 Bounty — unclaimed</span>
               ) : (
@@ -253,14 +259,32 @@ function RouteDetail({ route, signedIn, onClose, onChanged }) {
                 <div key={s.id} className="send">
                   <video src={s.videoUrl} controls preload="metadata" />
                   <span className="muted">
-                    {s.author} · {new Date(s.createdAt).toLocaleDateString()}
+                    {s.author}
+                    {s.grade != null && ` · called it V${s.grade}`} ·{" "}
+                    {new Date(s.createdAt).toLocaleDateString()}
                   </span>
                 </div>
               ))}
             </div>
 
             <form className="send-form" ref={formRef} onSubmit={submitSend}>
-              <input name="author" placeholder="Your name" required />
+              <input
+                name="author"
+                placeholder="Your name"
+                required
+                defaultValue={user?.name || ""}
+                readOnly={signedIn}
+                className={signedIn ? "locked" : ""}
+                title={signedIn ? "Posting as your account" : undefined}
+              />
+              <select name="grade" defaultValue="">
+                <option value="">Your grade opinion (optional)</option>
+                {Array.from({ length: 18 }, (_, i) => (
+                  <option key={i} value={i}>
+                    V{i}
+                  </option>
+                ))}
+              </select>
               {!signedIn && (
                 <input
                   name="passcode"
