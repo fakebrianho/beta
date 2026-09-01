@@ -40,8 +40,8 @@ export const api = {
   addRoute: (data) => post("/api/routes", data),
   deleteRoute: (id) => fetch(`/api/routes/${id}`, { method: "DELETE" }).then(json),
   checkPasscode: (passcode) => post("/api/check-passcode", { passcode }),
-  addSend: (routeId, { videoUrl, author, passcode }) =>
-    post(`/api/routes/${routeId}/sends`, { videoUrl, author, passcode }),
+  addSend: (routeId, data) => post(`/api/routes/${routeId}/sends`, data),
+  leaderboard: () => fetch("/api/leaderboard").then(json),
   deleteVideo: (id) => fetch(`/api/videos/${id}`, { method: "DELETE" }).then(json),
   setStatus: (id, status) =>
     fetch(`/api/videos/${id}`, {

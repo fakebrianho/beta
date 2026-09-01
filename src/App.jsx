@@ -5,6 +5,7 @@ import Dashboard from "./Dashboard.jsx";
 import ReviewPage from "./ReviewPage.jsx";
 import Gallery from "./Gallery.jsx";
 import Faq from "./Faq.jsx";
+import Leaderboard from "./Leaderboard.jsx";
 
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
@@ -63,6 +64,16 @@ export default function App() {
           </button>
           <button
             className={
+              tab === "leaderboard" && !activeVideoId && !showAuth
+                ? "active"
+                : ""
+            }
+            onClick={() => goTo("leaderboard")}
+          >
+            Leaderboard
+          </button>
+          <button
+            className={
               tab === "faq" && !activeVideoId && !showAuth ? "active" : ""
             }
             onClick={() => goTo("faq")}
@@ -115,6 +126,8 @@ export default function App() {
         />
       ) : tab === "faq" ? (
         <Faq />
+      ) : tab === "leaderboard" ? (
+        <Leaderboard />
       ) : tab === "gallery" ? (
         <Gallery user={user} />
       ) : (

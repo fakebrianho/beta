@@ -58,6 +58,8 @@ const sendSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }, // sends aren't tied to accounts
     author: { type: String, required: true },
     grade: { type: Number, min: 0, max: 17, default: null }, // sender's V-grade opinion
+    attempts: { type: Number, min: 1, default: null },
+    points: { type: Number, default: 0 }, // scored at submission (FA 5000, flash 3000, ...)
     videoUrl: { type: String, required: true },
   },
   { timestamps: true }

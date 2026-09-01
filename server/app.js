@@ -421,33 +421,74 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Leaderboard scoring: FA is a flat 5000 no matter the attempts; otherwise
+// flash 3000, 2nd go 2000, 3rd go 1000, beyond that 1000 - 10*attempts.
+function sendPoints(claimedFa, attempts) {
+  if (claimedFa) return 5000;
+  if (attempts <= 1) return 3000;
+  if (attempts === 2) return 2000;
+  if (attempts === 3) return 1000;
+  return Math.max(0, 1000 - 10 * attempts);
+}
+
+// Points only accrue to signed-up accounts (anonymous sends score 0)
+app.get("/api/leaderboard", async (req, res) => {
+  const rows = await Send.aggregate([
+    { $match: { user: { $ne: null } } },
+    {
+      $group: {
+        _id: "$user",
+        name: { $last: "$author" },
+        points: { $sum: "$points" },
+        sends: { $sum: 1 },
+        fas: { $sum: { $cond: [{ $eq: ["$points", 5000] }, 1, 0] } },
+      },
+    },
+    { $sort: { points: -1, sends: 1 } },
+    { $limit: 50 },
+  ]);
+  res.json(
+    rows.map((r, i) => ({
+      rank: i + 1,
+      name: r.name,
+      points: r.points,
+      sends: r.sends,
+      fas: r.fas,
+    }))
+  );
+});
+
 // Submit a send: a typed name + video, not tied to an account.
 // The first send claims the FA and flips the bounty.
 app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
-  const { videoUrl, author, passcode, grade } = req.body;
+  const { videoUrl, author, passcode, grade, attempts } = req.body;
   if (!videoUrl) return res.status(400).json({ error: "A send video is required" });
   const user = await userFromReq(req);
   const name = user?.name || author?.trim(); // signed-in sends use the account name
   if (!name) return res.status(400).json({ error: "Add your name" });
   if (!user && !passcodeOk(passcode))
     return res.status(401).json({ error: "Wrong passcode — ask at the gym" });
+  const tries = Math.floor(Number(attempts));
+  if (!Number.isFinite(tries) || tries < 1)
+    return res.status(400).json({ error: "How many attempts did it take?" });
   const g = Number(grade);
+  const claimedFa = route.status === "bounty";
   const send = await Send.create({
     route: route.id,
     user: user?.id || null,
     author: name,
     grade: Number.isFinite(g) && g >= 0 && g <= 17 ? g : null,
+    attempts: tries,
+    points: user ? sendPoints(claimedFa, tries) : 0,
     videoUrl,
   });
-  let claimedFa = false;
-  if (route.status === "bounty") {
+  if (claimedFa) {
     route.status = "fa";
     route.faBy = send.author;
     route.faAt = new Date();
     await route.save();
-    claimedFa = true;
   }
   res.status(201).json({ send, route, claimedFa });
 });

@@ -200,8 +200,11 @@ function RouteDetail({ route, user, onClose, onChanged }) {
     const author = user?.name || (fd.get("author") || "").trim();
     const passcode = (fd.get("passcode") || "").trim();
     const grade = fd.get("grade");
+    const attempts = fd.get("attempts");
     if (!file?.name) return setError("A send video is required.");
     if (!author) return setError("Add your name.");
+    if (!attempts || Number(attempts) < 1)
+      return setError("How many attempts did it take?");
     setError("");
     try {
       await api.checkPasscode(passcode); // fail fast before the big upload
@@ -212,6 +215,7 @@ function RouteDetail({ route, user, onClose, onChanged }) {
         author,
         passcode,
         grade: grade === "" ? null : Number(grade),
+        attempts: Number(attempts),
       });
       if (claimedFa) alert("🎉 First ascent! The bounty is yours.");
       formRef.current.reset();
@@ -260,7 +264,10 @@ function RouteDetail({ route, user, onClose, onChanged }) {
                   <video src={s.videoUrl} controls preload="metadata" />
                   <span className="muted">
                     {s.author}
-                    {s.grade != null && ` · called it V${s.grade}`} ·{" "}
+                    {s.attempts != null &&
+                      ` · ${s.attempts === 1 ? "⚡ flash" : `${s.attempts} attempts`}`}
+                    {s.grade != null && ` · called it V${s.grade}`}
+                    {s.points > 0 && ` · ${s.points} pts`} ·{" "}
                     {new Date(s.createdAt).toLocaleDateString()}
                   </span>
                 </div>
@@ -276,6 +283,14 @@ function RouteDetail({ route, user, onClose, onChanged }) {
                 readOnly={signedIn}
                 className={signedIn ? "locked" : ""}
                 title={signedIn ? "Posting as your account" : undefined}
+              />
+              <input
+                name="attempts"
+                type="number"
+                min={1}
+                step={1}
+                placeholder="Attempts it took (1 = flash)"
+                required
               />
               <select name="grade" defaultValue="">
                 <option value="">Your grade opinion (optional)</option>
