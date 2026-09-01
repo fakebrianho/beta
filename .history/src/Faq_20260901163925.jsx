@@ -19,7 +19,7 @@ const FAQS = [
 	},
 	{
 		q: "What's the gym passcode for?",
-		a: "It keeps random internet visitors from uploading junk. Anyone at the gym can get it just ask. If you have an account and are signed in, you don't need it.",
+		a: "It keeps random internet visitors from uploading junk. Anyone at the gym can get it — just ask. If you have an account and are signed in, you don't need it.",
 	},
 	{
 		q: 'How are grades decided?',

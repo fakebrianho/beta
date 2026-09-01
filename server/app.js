@@ -431,10 +431,12 @@ function sendPoints(claimedFa, attempts) {
   return Math.max(0, 1000 - 10 * attempts);
 }
 
-// Points only accrue to signed-up accounts (anonymous sends score 0)
+// Points only accrue to signed-up accounts (anonymous sends score 0).
+// Coaches never appear on the board.
 app.get("/api/leaderboard", async (req, res) => {
+  const coaches = await User.find({ role: "coach" }).select("_id");
   const rows = await Send.aggregate([
-    { $match: { user: { $ne: null } } },
+    { $match: { user: { $ne: null, $nin: coaches.map((c) => c._id) } } },
     {
       $group: {
         _id: "$user",
