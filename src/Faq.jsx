@@ -23,15 +23,15 @@ const FAQS = [
 	},
 	{
 		q: 'How are grades decided?',
-		a: "The grade shown on a route is the average of the setter's proposed grade and every grade submitted with a send. Think the grade is soft or sandbagged? Submit your send with your own grade opinion and move the needle.",
+		a: "The grade shown on a route is the average of the setter's proposed grade and every grade submitted with a send. Think the grade is soft? Submit your send with your own grade opinion and move the needle.",
 	},
 	{
 		q: 'Do I need an account?',
-		a: 'Not for browsing the gallery or submitting sends. You need an account for video coaching — uploading climbs for feedback and reviewing them with your coach.',
+		a: 'Not for browsing the gallery or submitting sends. You need an account for video coaching and to participate in the spray wall leaderboards.',
 	},
 	{
 		q: 'How do I sign in without a password?',
-		a: 'Choose "Use an email link instead" on the sign-in page and we\'ll email you a magic link — no password needed. Once signed in, you can also set a password from the top bar if you prefer regular login.',
+		a: 'Choose "Use an email link instead" on the sign-in page and we\'ll email you a magic link no password needed. Once signed in, you can also set a password from the top bar if you prefer regular login.',
 	},
 	{
 		q: 'How does video coaching work?',
@@ -39,7 +39,7 @@ const FAQS = [
 	},
 	{
 		q: 'What video formats work?',
-		a: 'Standard phone videos (MP4/MOV) up to 200MB work fine. For route photos, JPEG and PNG are safest — iPhone HEIC photos work when uploading from Safari.',
+		a: 'Standard phone videos (MP4/MOV) up to 200MB work fine. For route photos, JPEG and PNG are safest iPhone HEIC photos work when uploading from Safari.',
 	},
 ]
 
