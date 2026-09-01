@@ -125,6 +125,16 @@ app.post("/api/auth/logout", (req, res) => {
 
 app.get("/api/auth/me", requireAuth, (req, res) => res.json(req.user));
 
+// Let magic-link accounts (no password yet) add one so plain login works too
+app.post("/api/auth/set-password", requireAuth, async (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 6)
+    return res.status(400).json({ error: "Password must be 6+ characters" });
+  req.user.passwordHash = await bcrypt.hash(password, 10);
+  await req.user.save();
+  res.json(req.user);
+});
+
 // ---- Passwordless (magic link) ----
 // The link carries a short-lived JWT. Sent via Brevo (BREVO_API_KEY +
 // MAIL_FROM, a sender address verified in Brevo). Falls back to Resend

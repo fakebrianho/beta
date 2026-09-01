@@ -71,6 +71,7 @@ const clean = (schema) =>
     transform: (doc, ret) => {
       ret.id = ret._id.toString();
       delete ret._id;
+      if ("passwordHash" in ret) ret.hasPassword = !!ret.passwordHash;
       delete ret.passwordHash;
       if (ret.video) ret.videoId = ret.video.toString();
       return ret;

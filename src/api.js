@@ -16,6 +16,7 @@ export const api = {
   login: (data) => post("/api/auth/login", data),
   logout: () => post("/api/auth/logout", {}),
   magicLink: (data) => post("/api/auth/magic-link", data),
+  setPassword: (password) => post("/api/auth/set-password", { password }),
   listVideos: () => fetch("/api/videos").then(json),
   getVideo: (id) => fetch(`/api/videos/${id}`).then(json),
   // Browser → Vercel Blob directly (presigned PUT minted by /api/blob/upload)

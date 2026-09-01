@@ -66,6 +66,24 @@ export default function App() {
             <span className="muted">
               {user.name} · {user.role}
             </span>
+            {user.hasPassword === false && (
+              <button
+                onClick={async () => {
+                  const pw = prompt(
+                    "Choose a password (6+ characters) so you can also log in without an email link:"
+                  );
+                  if (!pw) return;
+                  try {
+                    setUser(await api.setPassword(pw));
+                    alert("Password set — you can now log in with email + password.");
+                  } catch (e) {
+                    alert(e.message);
+                  }
+                }}
+              >
+                Set password
+              </button>
+            )}
             <button onClick={logout}>Sign out</button>
           </div>
         ) : (
