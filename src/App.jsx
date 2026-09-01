@@ -4,6 +4,7 @@ import AuthPage from "./AuthPage.jsx";
 import Dashboard from "./Dashboard.jsx";
 import ReviewPage from "./ReviewPage.jsx";
 import Gallery from "./Gallery.jsx";
+import Faq from "./Faq.jsx";
 
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
@@ -60,6 +61,14 @@ export default function App() {
           >
             Gallery
           </button>
+          <button
+            className={
+              tab === "faq" && !activeVideoId && !showAuth ? "active" : ""
+            }
+            onClick={() => goTo("faq")}
+          >
+            FAQ
+          </button>
         </nav>
         {user ? (
           <div className="user-chip">
@@ -104,6 +113,8 @@ export default function App() {
           role={user.role}
           onBack={() => setActiveVideoId(null)}
         />
+      ) : tab === "faq" ? (
+        <Faq />
       ) : tab === "gallery" ? (
         <Gallery user={user} />
       ) : (

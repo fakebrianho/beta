@@ -234,6 +234,31 @@ input, textarea, select {
 .route-admin-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .route-admin-row .delete-btn { margin-left: auto; }
 
+/* faq */
+.faq { max-width: 720px; }
+.faq-list { display: flex; flex-direction: column; gap: 8px; }
+.faq-item { background: var(--panel); border-radius: 10px; overflow: hidden; }
+.faq-item.open { outline: 1px solid #2f3540; }
+.faq-q {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: transparent;
+  padding: 14px 16px;
+  font-weight: 600;
+  border-radius: 0;
+}
+.faq-chevron { color: var(--muted); font-size: 1.1rem; }
+.faq-a {
+  margin: 0;
+  padding: 0 16px 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 /* review page */
 .review { max-width: 1300px; margin: 0 auto; padding: 16px 20px; }
 .back { background: transparent; color: var(--muted); padding-left: 0; }
