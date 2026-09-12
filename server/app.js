@@ -417,6 +417,12 @@ app.patch("/api/routes/:id", requireAuth, async (req, res) => {
   if (!route) return res.status(404).json({ error: "Not found" });
   if ("gradeOverride" in req.body)
     route.gradeOverride = req.body.gradeOverride?.trim() || null;
+  if ("match" in req.body) route.match = !!req.body.match;
+  if (req.body.imageUrl && req.body.imageUrl !== route.imageUrl) {
+    if (route.imageUrl?.startsWith("https://"))
+      await del(route.imageUrl).catch(() => {});
+    route.imageUrl = req.body.imageUrl;
+  }
   if (req.body.title) route.title = req.body.title;
   await route.save();
   const sends = await Send.find({ route: route.id });

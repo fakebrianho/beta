@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
+import { toDisplayableImage } from "./image.js";
 
 export default function Dashboard({ role, onOpen }) {
   const [videos, setVideos] = useState([]);
@@ -22,6 +23,26 @@ export default function Dashboard({ role, onOpen }) {
     if (g === null) return;
     const updated = await api.updateRoute(r.id, { gradeOverride: g });
     setRoutes(routes.map((x) => (x.id === r.id ? { ...x, ...updated } : x)));
+  }
+
+  const patchRoute = async (id, data) => {
+    const updated = await api.updateRoute(id, data);
+    setRoutes((rs) => rs.map((x) => (x.id === id ? { ...x, ...updated } : x)));
+  };
+
+  async function toggleMatch(r) {
+    await patchRoute(r.id, { match: !r.match }).catch((e) => setError(e.message));
+  }
+
+  async function changePhoto(r, file) {
+    if (!file) return;
+    setError("");
+    try {
+      const imageUrl = await api.uploadFile(await toDisplayableImage(file));
+      await patchRoute(r.id, { imageUrl });
+    } catch (e) {
+      setError(e.message);
+    }
   }
 
   async function deleteRoute(id) {
@@ -125,6 +146,7 @@ export default function Dashboard({ role, onOpen }) {
                   <span className="muted">
                     {r.displayGrade || r.grade}
                     {r.gradeOverride && " (set by you)"} ·{" "}
+                    {r.match ? "match" : "no match"} ·{" "}
                     {r.status === "bounty" ? "💰 bounty" : `✓ FA by ${r.faBy}`} ·{" "}
                     {r.sendCount} send{r.sendCount === 1 ? "" : "s"}
                   </span>
@@ -135,6 +157,24 @@ export default function Dashboard({ role, onOpen }) {
                 >
                   ✎ grade
                 </button>
+                <button
+                  title="Toggle matching allowed"
+                  onClick={() => toggleMatch(r)}
+                >
+                  {r.match ? "🚫 no match" : "🤝 match"}
+                </button>
+                <label className="photo-btn" title="Replace the hero photo">
+                  📷
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => {
+                      changePhoto(r, e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
                 <button className="delete-btn" onClick={() => deleteRoute(r.id)}>
                   ✕
                 </button>
