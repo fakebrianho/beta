@@ -165,7 +165,7 @@ export default function App() {
       ) : tab === "faq" ? (
         <Faq />
       ) : tab === "leaderboard" ? (
-        <Leaderboard />
+        <Leaderboard role={user?.role} />
       ) : tab === "gallery" ? (
         <Gallery user={user} />
       ) : (

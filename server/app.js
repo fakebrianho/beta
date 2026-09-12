@@ -407,10 +407,17 @@ app.get("/api/routes/:id", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
   const sends = await Send.find({ route: route.id }).sort({ createdAt: 1 });
+  const grades = sends.map((s) => s.grade);
+  const gv = gradeValue(route, grades);
   res.json({
     ...route.toJSON(),
-    sends,
-    displayGrade: displayGrade(route, sends.map((s) => s.grade)),
+    displayGrade: displayGrade(route, grades),
+    sends: sends.map((s) => ({
+      ...s.toJSON(),
+      points: s.user
+        ? scoreSend({ grade: gv, attempts: s.attempts, fa: s.fa })
+        : 0,
+    })),
   });
 });
 
@@ -452,43 +459,95 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// Leaderboard scoring: FA is a flat 5000 no matter the attempts; otherwise
-// flash 3000, 2nd go 2000, 3rd go 1000, beyond that 1000 - 10*attempts.
-function sendPoints(claimedFa, attempts) {
-  if (claimedFa) return 5000;
-  if (attempts <= 1) return 3000;
-  if (attempts === 2) return 2000;
-  if (attempts === 3) return 1000;
-  return Math.max(0, 1000 - 10 * attempts);
+// Leaderboard scoring, off the route's effective grade:
+//   base      = grade × 1000 (V0 floors at 1000)
+//   flash     = base + 1000 bonus, with no attempt penalty (no bonus at V0)
+//   otherwise = base − 100 × attempts
+//   FA        = +1000 on top
+// Scores are computed live so regrades flow through to the board.
+function scoreSend({ grade, attempts, fa }) {
+  if (!Number.isFinite(attempts) || attempts < 1) return 0; // pre-attempts send
+  const g = Number.isFinite(grade) ? grade : 0;
+  const base = Math.max(g, 1) * 1000;
+  let pts =
+    attempts <= 1 ? base + (g === 0 ? 0 : 1000) : base - 100 * attempts;
+  if (fa) pts += 1000;
+  return Math.max(0, Math.round(pts));
+}
+
+// Numeric form of a route's shown grade ("V4.5" → 4.5)
+function gradeValue(route, sendGrades) {
+  const m = String(displayGrade(route, sendGrades)).match(/(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : 0;
 }
 
 // Points only accrue to signed-up accounts (anonymous sends score 0).
 // Coaches never appear on the board.
-app.get("/api/leaderboard", async (req, res) => {
-  const coaches = await User.find({ role: "coach" }).select("_id");
-  const rows = await Send.aggregate([
-    { $match: { user: { $ne: null, $nin: coaches.map((c) => c._id) } } },
-    {
-      $group: {
-        _id: "$user",
-        name: { $last: "$author" },
-        points: { $sum: "$points" },
-        sends: { $sum: 1 },
-        fas: { $sum: { $cond: [{ $eq: ["$points", 5000] }, 1, 0] } },
-      },
-    },
-    { $sort: { points: -1, sends: 1 } },
-    { $limit: 50 },
+async function leaderboardRows() {
+  const [users, routes, sends] = await Promise.all([
+    User.find({ role: { $ne: "coach" } }),
+    Route.find(),
+    Send.find({ user: { $ne: null } }),
   ]);
-  res.json(
-    rows.map((r, i) => ({
-      rank: i + 1,
-      name: r.name,
-      points: r.points,
-      sends: r.sends,
-      fas: r.fas,
-    }))
+
+  const sendsByRoute = {};
+  for (const s of sends) (sendsByRoute[s.route.toString()] ||= []).push(s);
+  const gradeByRoute = {};
+  for (const r of routes)
+    gradeByRoute[r.id] = gradeValue(
+      r,
+      (sendsByRoute[r.id] || []).map((s) => s.grade)
+    );
+
+  const byUser = new Map(
+    users.map((u) => [
+      u.id,
+      {
+        id: u.id,
+        name: u.name,
+        earned: 0,
+        adjustment: u.pointsAdjustment || 0,
+        sends: 0,
+        fas: 0,
+      },
+    ])
   );
+  for (const s of sends) {
+    const row = byUser.get(s.user.toString());
+    if (!row) continue; // coach, or a deleted account
+    row.earned += scoreSend({
+      grade: gradeByRoute[s.route.toString()],
+      attempts: s.attempts,
+      fa: s.fa,
+    });
+    row.sends++;
+    if (s.fa) row.fas++;
+  }
+
+  return [...byUser.values()]
+    .map((r) => ({ ...r, points: r.earned + r.adjustment }))
+    .filter((r) => r.sends > 0 || r.adjustment !== 0)
+    .sort((a, b) => b.points - a.points || a.sends - b.sends)
+    .map((r, i) => ({ rank: i + 1, ...r }));
+}
+
+app.get("/api/leaderboard", async (req, res) => {
+  res.json(await leaderboardRows());
+});
+
+// Coach can nudge anyone's total; we store the delta so new sends still count
+app.patch("/api/users/:id/points", requireAuth, async (req, res) => {
+  if (req.user.role !== "coach")
+    return res.status(403).json({ error: "Only coaches can edit scores" });
+  const user = await User.findById(req.params.id).catch(() => null);
+  if (!user) return res.status(404).json({ error: "No such user" });
+  const target = Number(req.body.points);
+  if (!Number.isFinite(target))
+    return res.status(400).json({ error: "Points must be a number" });
+  const row = (await leaderboardRows()).find((r) => r.id === user.id);
+  user.pointsAdjustment = Math.round(target - (row?.earned || 0));
+  await user.save();
+  res.json(await leaderboardRows());
 });
 
 // Submit a send: a typed name + video, not tied to an account.
@@ -508,13 +567,24 @@ app.post("/api/routes/:id/sends", async (req, res) => {
     return res.status(400).json({ error: "How many attempts did it take?" });
   const g = Number(grade);
   const claimedFa = route.status === "bounty";
+  const sendGrade = Number.isFinite(g) && g >= 0 && g <= 17 ? g : null;
+  const allGrades = (await Send.find({ route: route.id }).select("grade"))
+    .map((s) => s.grade)
+    .concat(sendGrade);
   const send = await Send.create({
     route: route.id,
     user: user?.id || null,
     author: name,
-    grade: Number.isFinite(g) && g >= 0 && g <= 17 ? g : null,
+    grade: sendGrade,
     attempts: tries,
-    points: user ? sendPoints(claimedFa, tries) : 0,
+    fa: claimedFa,
+    points: user
+      ? scoreSend({
+          grade: gradeValue(route, allGrades),
+          attempts: tries,
+          fa: claimedFa,
+        })
+      : 0,
     videoUrl,
   });
   if (claimedFa) {

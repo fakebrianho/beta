@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     passwordHash: { type: String, default: null }, // null for passwordless (magic-link) accounts
     role: { type: String, enum: ["student", "coach"], default: "student" },
+    pointsAdjustment: { type: Number, default: 0 }, // coach's manual leaderboard tweak
   },
   { timestamps: true }
 );
@@ -61,7 +62,8 @@ const sendSchema = new mongoose.Schema(
     author: { type: String, required: true },
     grade: { type: Number, min: 0, max: 17, default: null }, // sender's V-grade opinion
     attempts: { type: Number, min: 1, default: null },
-    points: { type: Number, default: 0 }, // scored at submission (FA 5000, flash 3000, ...)
+    fa: { type: Boolean, default: false }, // claimed the route's first ascent
+    points: { type: Number, default: 0 }, // legacy snapshot; scores are computed live
     videoUrl: { type: String, required: true },
   },
   { timestamps: true }

@@ -11,7 +11,7 @@ const FAQS = [
 	},
 	{
 		q: 'How does the leaderboard work?',
-		a: "If you're signed up, when you send a route you get points based on how many attempts it took. If you get an FA it's 5000 points, a flash is 3000 points (does not add onto the 5000 if it's a FA + flash, you just get 5000), 2nd attempt is 2000, 3rd attempt 1000, every attempt after is 1000 - (10 * number of attempts).",
+		a: "If you're signed up, points scale with the grade and how many attempts it took. Base is grade * 1000 (V0 counts as 1000). A flash adds a 1000 bonus and takes no attempt penalty, so a V5 flash is 5000 + 1000 = 6000. Anything else is base - (100 * attempts), so a 4th go on a V5 is 5000 - 400 = 4600. An FA adds another 1000 on top. V0s don't get the flash bonus. If a route gets regraded, everyone's points for it move with it.",
 	},
 	{
 		q: 'How do I submit a send?',

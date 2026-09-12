@@ -48,6 +48,12 @@ export const api = {
   checkPasscode: (passcode) => post("/api/check-passcode", { passcode }),
   addSend: (routeId, data) => post(`/api/routes/${routeId}/sends`, data),
   leaderboard: () => fetch("/api/leaderboard").then(json),
+  setUserPoints: (userId, points) =>
+    fetch(`/api/users/${userId}/points`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ points }),
+    }).then(json),
   deleteVideo: (id) => fetch(`/api/videos/${id}`, { method: "DELETE" }).then(json),
   setStatus: (id, status) =>
     fetch(`/api/videos/${id}`, {
