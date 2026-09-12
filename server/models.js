@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, default: null }, // null for passwordless (magic-link) accounts
     role: { type: String, enum: ["student", "coach"], default: "student" },
     pointsAdjustment: { type: Number, default: 0 }, // coach's manual leaderboard tweak
+    favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Route" }],
   },
   { timestamps: true }
 );

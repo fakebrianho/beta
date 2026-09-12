@@ -3,7 +3,7 @@ import { api } from "./api.js";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export default function Leaderboard({ role }) {
+export default function Leaderboard({ role, onOpenProfile }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
   const isCoach = role === "coach";
@@ -51,7 +51,12 @@ export default function Leaderboard({ role }) {
           {rows.map((r) => (
             <div key={r.id} className={`lb-row ${r.rank <= 3 ? "top" : ""}`}>
               <span>{MEDALS[r.rank - 1] || r.rank}</span>
-              <span className="lb-name">{r.name}</span>
+              <span
+                className={`lb-name ${onOpenProfile ? "clickable" : ""}`}
+                onClick={() => onOpenProfile?.(r.id)}
+              >
+                {r.name}
+              </span>
               <span className="lb-points">
                 {r.points.toLocaleString()}
                 {r.adjustment !== 0 && (

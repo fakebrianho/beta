@@ -547,6 +547,113 @@ select {
 	font-weight: 600;
 }
 
+/* favorites */
+.fav-btn {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	background: rgba(0, 0, 0, 0.5);
+	color: #fff;
+	font-size: 1.1rem;
+	line-height: 1;
+	padding: 6px 9px;
+	border-radius: 20px;
+}
+.fav-btn.on {
+	color: #ff375f;
+}
+.fav-btn.inline {
+	position: static;
+	background: transparent;
+	padding: 0 6px;
+	font-size: 1.3rem;
+}
+
+/* profile */
+.profile-head {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-bottom: 16px;
+}
+.profile-head h2 {
+	margin: 0 0 2px;
+}
+.avatar {
+	width: 56px;
+	height: 56px;
+	border-radius: 50%;
+	background: var(--accent);
+	color: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1.5rem;
+	font-weight: 700;
+	flex-shrink: 0;
+}
+.profile-tabs {
+	display: inline-flex;
+	margin-bottom: 16px;
+}
+.mini-route {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	cursor: pointer;
+	min-width: 0;
+}
+.mini-route img {
+	width: 52px;
+	height: 68px;
+	object-fit: cover;
+	border-radius: 8px;
+	flex-shrink: 0;
+}
+.mini-route-body {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+.mini-route-body strong {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.send-history {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.send-history-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	background: var(--panel);
+	border-radius: 10px;
+	padding: 8px 12px;
+}
+.send-history-meta {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 2px;
+	text-align: right;
+	flex-shrink: 0;
+}
+.fav-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 10px;
+}
+.fav-grid .mini-route {
+	background: var(--panel);
+	border-radius: 10px;
+	padding: 8px 10px;
+}
+
 /* leaderboard */
 .leaderboard {
 	max-width: 720px;
@@ -564,6 +671,12 @@ select {
 	background: transparent;
 	color: var(--muted);
 	padding: 2px 6px;
+}
+.lb-name.clickable {
+	cursor: pointer;
+}
+.lb-name.clickable:hover {
+	color: var(--accent);
 }
 .lb-adj {
 	margin-left: 6px;

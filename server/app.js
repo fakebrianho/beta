@@ -377,13 +377,27 @@ app.get("/api/routes", async (req, res) => {
     { $group: { _id: "$route", n: { $sum: 1 }, grades: { $push: "$grade" } } },
   ]);
   const byId = Object.fromEntries(stats.map((s) => [s._id.toString(), s]));
+  const viewer = await userFromReq(req);
+  const faves = new Set((viewer?.favorites || []).map((f) => f.toString()));
   res.json(
     routes.map((r) => ({
       ...r.toJSON(),
       sendCount: byId[r.id]?.n || 0,
       displayGrade: displayGrade(r, byId[r.id]?.grades || []),
+      favorited: faves.has(r.id),
     }))
   );
+});
+
+// Heart a route (toggles)
+app.post("/api/routes/:id/favorite", requireAuth, async (req, res) => {
+  const route = await Route.findById(req.params.id).catch(() => null);
+  if (!route) return res.status(404).json({ error: "Not found" });
+  const i = req.user.favorites.findIndex((f) => f.equals(route._id));
+  if (i >= 0) req.user.favorites.splice(i, 1);
+  else req.user.favorites.push(route._id);
+  await req.user.save();
+  res.json({ favorited: i < 0 });
 });
 
 app.post("/api/routes", requireAuth, async (req, res) => {
@@ -409,9 +423,11 @@ app.get("/api/routes/:id", async (req, res) => {
   const sends = await Send.find({ route: route.id }).sort({ createdAt: 1 });
   const grades = sends.map((s) => s.grade);
   const gv = gradeValue(route, grades);
+  const viewer = await userFromReq(req);
   res.json({
     ...route.toJSON(),
     displayGrade: displayGrade(route, grades),
+    favorited: !!viewer?.favorites.some((f) => f.equals(route._id)),
     sends: sends.map((s) => ({
       ...s.toJSON(),
       points: s.user
@@ -533,6 +549,80 @@ async function leaderboardRows() {
 
 app.get("/api/leaderboard", async (req, res) => {
   res.json(await leaderboardRows());
+});
+
+// ---- Profiles: a climber's sends, plus their favorites when it's their own ----
+async function buildProfile(user, isSelf) {
+  const sends = await Send.find({ user: user.id }).sort({ createdAt: -1 });
+  const wanted = [
+    ...new Set([
+      ...sends.map((s) => s.route.toString()),
+      ...(isSelf ? user.favorites.map((f) => f.toString()) : []),
+    ]),
+  ];
+  const routes = await Route.find({ _id: { $in: wanted } });
+  const gradeSends = await Send.find({ route: { $in: wanted } }).select(
+    "route grade"
+  );
+  const byRoute = {};
+  for (const s of gradeSends) (byRoute[s.route.toString()] ||= []).push(s.grade);
+
+  const summary = (r) => ({
+    id: r.id,
+    title: r.title,
+    imageUrl: r.imageUrl,
+    status: r.status,
+    match: r.match,
+    tags: r.tags,
+    displayGrade: displayGrade(r, byRoute[r.id] || []),
+  });
+  const routeById = Object.fromEntries(routes.map((r) => [r.id, r]));
+  const gradeOf = (id) =>
+    routeById[id] ? gradeValue(routeById[id], byRoute[id] || []) : 0;
+
+  const row = (await leaderboardRows()).find((r) => r.id === user.id);
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+    joined: user.createdAt,
+    points: row?.points || 0,
+    rank: row?.rank || null,
+    isSelf,
+    sends: sends
+      .filter((s) => routeById[s.route.toString()])
+      .map((s) => ({
+        id: s.id,
+        attempts: s.attempts,
+        grade: s.grade,
+        fa: s.fa,
+        videoUrl: s.videoUrl,
+        createdAt: s.createdAt,
+        points: scoreSend({
+          grade: gradeOf(s.route.toString()),
+          attempts: s.attempts,
+          fa: s.fa,
+        }),
+        route: summary(routeById[s.route.toString()]),
+      })),
+    favorites: isSelf
+      ? user.favorites
+          .map((f) => routeById[f.toString()])
+          .filter(Boolean)
+          .map(summary)
+      : [],
+  };
+}
+
+app.get("/api/profile", requireAuth, async (req, res) =>
+  res.json(await buildProfile(req.user, true))
+);
+
+app.get("/api/profile/:id", async (req, res) => {
+  const user = await User.findById(req.params.id).catch(() => null);
+  if (!user) return res.status(404).json({ error: "No such climber" });
+  const viewer = await userFromReq(req);
+  res.json(await buildProfile(user, viewer?.id === user.id));
 });
 
 // Coach can nudge anyone's total; we store the delta so new sends still count

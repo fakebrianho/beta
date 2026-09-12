@@ -6,6 +6,7 @@ import ReviewPage from "./ReviewPage.jsx";
 import Gallery from "./Gallery.jsx";
 import Faq from "./Faq.jsx";
 import Leaderboard from "./Leaderboard.jsx";
+import Profile from "./Profile.jsx";
 
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
@@ -14,6 +15,8 @@ export default function App() {
   const [tab, setTab] = useState("gallery"); // "dashboard" | "gallery"
   const [showAuth, setShowAuth] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileId, setProfileId] = useState(null); // null = own profile
+  const [galleryRouteId, setGalleryRouteId] = useState(null);
 
   useEffect(() => {
     api.me().then((u) => {
@@ -49,13 +52,28 @@ export default function App() {
     setActiveVideoId(null);
     setShowAuth(false);
     setMenuOpen(false);
+    if (t !== "gallery") setGalleryRouteId(null);
+    if (t !== "profile") setProfileId(null);
     setTab(t);
+  };
+
+  // Open someone's profile from the leaderboard, or a route from a profile
+  const openProfile = (id) => {
+    setProfileId(id && id !== user?.id ? id : null);
+    goTo("profile");
+  };
+  const openRouteInGallery = (id) => {
+    setGalleryRouteId(id);
+    setActiveVideoId(null);
+    setMenuOpen(false);
+    setTab("gallery");
   };
 
   const TABS = [
     { key: "dashboard", label: "Dashboard", signedInOnly: true },
     { key: "gallery", label: "Gallery" },
     { key: "leaderboard", label: "Leaderboard" },
+    { key: "profile", label: "Profile", signedInOnly: true },
     { key: "faq", label: "FAQ" },
   ].filter((t) => !t.signedInOnly || user);
 
@@ -165,9 +183,15 @@ export default function App() {
       ) : tab === "faq" ? (
         <Faq />
       ) : tab === "leaderboard" ? (
-        <Leaderboard role={user?.role} />
+        <Leaderboard role={user?.role} onOpenProfile={openProfile} />
+      ) : tab === "profile" && (user || profileId) ? (
+        <Profile userId={profileId} onOpenRoute={openRouteInGallery} />
       ) : tab === "gallery" ? (
-        <Gallery user={user} />
+        <Gallery
+          user={user}
+          initialRouteId={galleryRouteId}
+          onConsumedInitialRoute={() => setGalleryRouteId(null)}
+        />
       ) : (
         <Dashboard role={user.role} onOpen={setActiveVideoId} />
       )}

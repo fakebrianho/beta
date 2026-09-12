@@ -29,7 +29,11 @@ function TagDots({ tags, onTag }) {
   );
 }
 
-export default function Gallery({ user }) {
+export default function Gallery({
+  user,
+  initialRouteId,
+  onConsumedInitialRoute,
+}) {
   const role = user?.role || null;
   const [routes, setRoutes] = useState([]);
   const [openRoute, setOpenRoute] = useState(null); // full route with sends
@@ -56,8 +60,21 @@ export default function Gallery({ user }) {
     refresh();
   }, []);
 
+  // Arriving from a profile tile: pop that route straight open
+  useEffect(() => {
+    if (!initialRouteId) return;
+    api.getRoute(initialRouteId).then(setOpenRoute).catch(() => {});
+    onConsumedInitialRoute?.();
+  }, [initialRouteId]);
+
   async function open(id) {
     setOpenRoute(await api.getRoute(id));
+  }
+
+  async function toggleFavorite(id) {
+    const { favorited } = await api.toggleFavorite(id);
+    setRoutes((rs) => rs.map((r) => (r.id === id ? { ...r, favorited } : r)));
+    setOpenRoute((o) => (o?.id === id ? { ...o, favorited } : o));
   }
 
   return (
@@ -134,6 +151,18 @@ export default function Gallery({ user }) {
         {filtered.map((r) => (
           <div key={r.id} className="route-card" onClick={() => open(r.id)}>
             <img src={r.imageUrl} alt={r.title} loading="lazy" />
+            {user && (
+              <button
+                className={`fav-btn ${r.favorited ? "on" : ""}`}
+                title={r.favorited ? "Remove from favorites" : "Add to favorites"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavorite(r.id);
+                }}
+              >
+                {r.favorited ? "♥" : "♡"}
+              </button>
+            )}
             <div className="route-card-overlay">
               <strong>
                 {r.title} · {r.match ? "match" : "no match"}
@@ -169,6 +198,7 @@ export default function Gallery({ user }) {
         <RouteDetail
           route={openRoute}
           user={user}
+          onToggleFavorite={() => toggleFavorite(openRoute.id)}
           onClose={() => setOpenRoute(null)}
           onChanged={async () => {
             await open(openRoute.id);
@@ -240,7 +270,7 @@ function AddRouteModal({ onClose, onAdded }) {
   );
 }
 
-function RouteDetail({ route, user, onClose, onChanged }) {
+function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
   const signedIn = user != null;
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
@@ -287,8 +317,21 @@ function RouteDetail({ route, user, onClose, onChanged }) {
         <div className="route-detail-layout">
           <img className="route-hero" src={route.imageUrl} alt={route.title} />
           <div className="route-info">
-            <h3>
-              {route.title} · {route.match ? "match" : "no match"}
+            <h3 className="route-title-row">
+              <span>
+                {route.title} · {route.match ? "match" : "no match"}
+              </span>
+              {user && (
+                <button
+                  className={`fav-btn inline ${route.favorited ? "on" : ""}`}
+                  title={
+                    route.favorited ? "Remove from favorites" : "Add to favorites"
+                  }
+                  onClick={onToggleFavorite}
+                >
+                  {route.favorited ? "♥" : "♡"}
+                </button>
+              )}
             </h3>
             <div className="badges">
               <span className="badge grade" title={`Proposed: ${route.grade}`}>

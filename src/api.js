@@ -48,6 +48,9 @@ export const api = {
   checkPasscode: (passcode) => post("/api/check-passcode", { passcode }),
   addSend: (routeId, data) => post(`/api/routes/${routeId}/sends`, data),
   leaderboard: () => fetch("/api/leaderboard").then(json),
+  toggleFavorite: (routeId) => post(`/api/routes/${routeId}/favorite`, {}),
+  profile: (userId) =>
+    fetch(userId ? `/api/profile/${userId}` : "/api/profile").then(json),
   setUserPoints: (userId, points) =>
     fetch(`/api/users/${userId}/points`, {
       method: "PATCH",
