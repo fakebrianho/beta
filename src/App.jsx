@@ -6,7 +6,7 @@ import ReviewPage from "./ReviewPage.jsx";
 import Gallery from "./Gallery.jsx";
 import Faq from "./Faq.jsx";
 import Leaderboard from "./Leaderboard.jsx";
-import Profile from "./Profile.jsx";
+import Profile, { Avatar } from "./Profile.jsx";
 
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
@@ -101,7 +101,12 @@ export default function App() {
         </nav>
         {user ? (
           <div className="user-chip desktop-only">
-            <span className="muted">
+            <span
+              className="muted user-link"
+              onClick={() => openProfile(null)}
+              title="Your profile"
+            >
+              <Avatar name={user.name} url={user.avatarUrl} size={26} />
               {user.name} · {user.role}
             </span>
             {user.hasPassword === false && (
@@ -185,7 +190,11 @@ export default function App() {
       ) : tab === "leaderboard" ? (
         <Leaderboard role={user?.role} onOpenProfile={openProfile} />
       ) : tab === "profile" && (user || profileId) ? (
-        <Profile userId={profileId} onOpenRoute={openRouteInGallery} />
+        <Profile
+          userId={profileId}
+          onOpenRoute={openRouteInGallery}
+          onAvatarChange={(me) => setUser((u) => ({ ...u, ...me }))}
+        />
       ) : tab === "gallery" ? (
         <Gallery
           user={user}

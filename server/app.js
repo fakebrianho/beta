@@ -521,6 +521,7 @@ async function leaderboardRows() {
       {
         id: u.id,
         name: u.name,
+        avatarUrl: u.avatarUrl,
         earned: 0,
         adjustment: u.pointsAdjustment || 0,
         sends: 0,
@@ -584,6 +585,7 @@ async function buildProfile(user, isSelf) {
   return {
     id: user.id,
     name: user.name,
+    avatarUrl: user.avatarUrl,
     role: user.role,
     joined: user.createdAt,
     points: row?.points || 0,
@@ -617,6 +619,22 @@ async function buildProfile(user, isSelf) {
 app.get("/api/profile", requireAuth, async (req, res) =>
   res.json(await buildProfile(req.user, true))
 );
+
+// Profile picture (client uploads to Blob first, then hands us the URL)
+app.patch("/api/profile", requireAuth, async (req, res) => {
+  const { avatarUrl, name } = req.body;
+  if ("avatarUrl" in req.body) {
+    const next = avatarUrl?.trim() || null;
+    if (next && !next.includes(".blob.vercel-storage.com/"))
+      return res.status(400).json({ error: "Bad image URL" });
+    if (req.user.avatarUrl && req.user.avatarUrl !== next)
+      await del(req.user.avatarUrl).catch(() => {});
+    req.user.avatarUrl = next;
+  }
+  if (name?.trim()) req.user.name = name.trim();
+  await req.user.save();
+  res.json(req.user);
+});
 
 app.get("/api/profile/:id", async (req, res) => {
   const user = await User.findById(req.params.id).catch(() => null);

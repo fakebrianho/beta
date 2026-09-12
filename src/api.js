@@ -49,6 +49,12 @@ export const api = {
   addSend: (routeId, data) => post(`/api/routes/${routeId}/sends`, data),
   leaderboard: () => fetch("/api/leaderboard").then(json),
   toggleFavorite: (routeId) => post(`/api/routes/${routeId}/favorite`, {}),
+  updateProfile: (data) =>
+    fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json),
   profile: (userId) =>
     fetch(userId ? `/api/profile/${userId}` : "/api/profile").then(json),
   setUserPoints: (userId, points) =>

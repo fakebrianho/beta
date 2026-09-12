@@ -1,6 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { api } from "./api.js";
+import { toDisplayableImage } from "./image.js";
 import { TAG_COLORS } from "./tags.js";
+
+export function Avatar({ name, url, size }) {
+  const style = size ? { width: size, height: size, fontSize: size / 2.4 } : null;
+  return url ? (
+    <img className="avatar" src={url} alt={name} style={style} />
+  ) : (
+    <div className="avatar" style={style}>
+      {(name || "?").slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
 
 function RouteTile({ route, onOpen }) {
   return (
@@ -29,25 +41,80 @@ function RouteTile({ route, onOpen }) {
   );
 }
 
-export default function Profile({ userId, onOpenRoute }) {
+export default function Profile({ userId, onOpenRoute, onAvatarChange }) {
   const [p, setProfile] = useState(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("sends");
+  const [busy, setBusy] = useState(false);
+
+  async function uploadAvatar(file) {
+    if (!file) return;
+    setError("");
+    setBusy(true);
+    try {
+      const avatarUrl = await api.uploadFile(await toDisplayableImage(file));
+      const me = await api.updateProfile({ avatarUrl });
+      setProfile((prev) => ({ ...prev, avatarUrl: me.avatarUrl }));
+      onAvatarChange?.(me);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeAvatar() {
+    setBusy(true);
+    try {
+      const me = await api.updateProfile({ avatarUrl: null });
+      setProfile((prev) => ({ ...prev, avatarUrl: null }));
+      onAvatarChange?.(me);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     setProfile(null);
     api.profile(userId).then(setProfile).catch((e) => setError(e.message));
   }, [userId]);
 
-  if (error) return <main className="dashboard"><p className="error">{error}</p></main>;
-  if (!p) return <main className="dashboard" />;
+  // an upload error shouldn't blow away the loaded profile
+  if (!p)
+    return (
+      <main className="dashboard">
+        {error && <p className="error">{error}</p>}
+      </main>
+    );
 
   const list = tab === "sends" ? p.sends : p.favorites;
 
   return (
     <main className="dashboard profile">
       <div className="profile-head">
-        <div className="avatar">{p.name.slice(0, 1).toUpperCase()}</div>
+        {p.isSelf ? (
+          <label
+            className={`avatar-edit ${busy ? "busy" : ""}`}
+            title="Change profile picture"
+          >
+            <Avatar name={p.name} url={p.avatarUrl} />
+            <span className="avatar-overlay">{busy ? "…" : "📷"}</span>
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              disabled={busy}
+              onChange={(e) => {
+                uploadAvatar(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        ) : (
+          <Avatar name={p.name} url={p.avatarUrl} />
+        )}
         <div>
           <h2>{p.name}</h2>
           <span className="muted">
@@ -57,8 +124,14 @@ export default function Profile({ userId, onOpenRoute }) {
             {p.sends.some((s) => s.fa) &&
               ` · ${p.sends.filter((s) => s.fa).length} FA`}
           </span>
+          {p.isSelf && p.avatarUrl && (
+            <button className="link-btn" onClick={removeAvatar} disabled={busy}>
+              remove photo
+            </button>
+          )}
         </div>
       </div>
+      {error && <p className="error">{error}</p>}
 
       <div className="role-toggle profile-tabs">
         <button

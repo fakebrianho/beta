@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ["student", "coach"], default: "student" },
     pointsAdjustment: { type: Number, default: 0 }, // coach's manual leaderboard tweak
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Route" }],
+    avatarUrl: { type: String, default: null },
   },
   { timestamps: true }
 );

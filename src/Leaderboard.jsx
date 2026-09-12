@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api } from "./api.js";
+import { Avatar } from "./Profile.jsx";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -55,6 +56,7 @@ export default function Leaderboard({ role, onOpenProfile }) {
                 className={`lb-name ${onOpenProfile ? "clickable" : ""}`}
                 onClick={() => onOpenProfile?.(r.id)}
               >
+                <Avatar name={r.name} url={r.avatarUrl} size={26} />
                 {r.name}
               </span>
               <span className="lb-points">
