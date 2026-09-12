@@ -13,6 +13,7 @@ export default function App() {
   // Signed out: gallery is public, dashboard requires sign-in
   const [tab, setTab] = useState("gallery"); // "dashboard" | "gallery"
   const [showAuth, setShowAuth] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     api.me().then((u) => {
@@ -26,6 +27,20 @@ export default function App() {
     setUser(null);
     setActiveVideoId(null);
     setTab("gallery");
+    setMenuOpen(false);
+  }
+
+  async function choosePassword() {
+    const pw = prompt(
+      "Choose a password (6+ characters) so you can also log in without an email link:"
+    );
+    if (!pw) return;
+    try {
+      setUser(await api.setPassword(pw));
+      alert("Password set — you can now log in with email + password.");
+    } catch (e) {
+      alert(e.message);
+    }
   }
 
   if (user === undefined) return null;
@@ -33,8 +48,18 @@ export default function App() {
   const goTo = (t) => {
     setActiveVideoId(null);
     setShowAuth(false);
+    setMenuOpen(false);
     setTab(t);
   };
+
+  const TABS = [
+    { key: "dashboard", label: "Dashboard", signedInOnly: true },
+    { key: "gallery", label: "Gallery" },
+    { key: "leaderboard", label: "Leaderboard" },
+    { key: "faq", label: "FAQ" },
+  ].filter((t) => !t.signedInOnly || user);
+
+  const isActive = (key) => tab === key && !activeVideoId && !showAuth;
 
   return (
     <div className="app">
@@ -45,69 +70,82 @@ export default function App() {
         >
           🧗 Beta
         </div>
-        <nav className="role-toggle tabs">
-          {user && (
+        <nav className="role-toggle tabs desktop-only">
+          {TABS.map((t) => (
             <button
-              className={tab === "dashboard" && !activeVideoId ? "active" : ""}
-              onClick={() => goTo("dashboard")}
+              key={t.key}
+              className={isActive(t.key) ? "active" : ""}
+              onClick={() => goTo(t.key)}
             >
-              Dashboard
+              {t.label}
             </button>
-          )}
-          <button
-            className={
-              tab === "gallery" && !activeVideoId && !showAuth ? "active" : ""
-            }
-            onClick={() => goTo("gallery")}
-          >
-            Gallery
-          </button>
-          <button
-            className={
-              tab === "leaderboard" && !activeVideoId && !showAuth
-                ? "active"
-                : ""
-            }
-            onClick={() => goTo("leaderboard")}
-          >
-            Leaderboard
-          </button>
-          <button
-            className={
-              tab === "faq" && !activeVideoId && !showAuth ? "active" : ""
-            }
-            onClick={() => goTo("faq")}
-          >
-            FAQ
-          </button>
+          ))}
         </nav>
         {user ? (
-          <div className="user-chip">
+          <div className="user-chip desktop-only">
             <span className="muted">
               {user.name} · {user.role}
             </span>
             {user.hasPassword === false && (
-              <button
-                onClick={async () => {
-                  const pw = prompt(
-                    "Choose a password (6+ characters) so you can also log in without an email link:"
-                  );
-                  if (!pw) return;
-                  try {
-                    setUser(await api.setPassword(pw));
-                    alert("Password set — you can now log in with email + password.");
-                  } catch (e) {
-                    alert(e.message);
-                  }
-                }}
-              >
-                Set password
-              </button>
+              <button onClick={choosePassword}>Set password</button>
             )}
             <button onClick={logout}>Sign out</button>
           </div>
         ) : (
-          <button onClick={() => setShowAuth(true)}>Sign in</button>
+          <button className="desktop-only" onClick={() => setShowAuth(true)}>
+            Sign in
+          </button>
+        )}
+
+        <button
+          className="hamburger"
+          aria-label="Menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          {menuOpen ? "✕" : "☰"}
+        </button>
+
+        {menuOpen && (
+          <div className="mobile-menu">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                className={isActive(t.key) ? "active" : ""}
+                onClick={() => goTo(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+            <div className="mobile-menu-sep" />
+            {user ? (
+              <>
+                <span className="muted">
+                  {user.name} · {user.role}
+                </span>
+                {user.hasPassword === false && (
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      choosePassword();
+                    }}
+                  >
+                    Set password
+                  </button>
+                )}
+                <button onClick={logout}>Sign out</button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setShowAuth(true);
+                  setMenuOpen(false);
+                }}
+              >
+                Sign in
+              </button>
+            )}
+          </div>
         )}
       </header>
       {!user && showAuth ? (
