@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
+import { TAGS, TAG_COLORS } from "./tags.js";
 
 export default function Dashboard({ role, onOpen }) {
   const [videos, setVideos] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [tagEditor, setTagEditor] = useState(null); // route id with tag editor open
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
   const formRef = useRef(null);
@@ -29,6 +31,13 @@ export default function Dashboard({ role, onOpen }) {
     const updated = await api.updateRoute(id, data);
     setRoutes((rs) => rs.map((x) => (x.id === id ? { ...x, ...updated } : x)));
   };
+
+  async function toggleTag(r, tag) {
+    const tags = r.tags?.includes(tag)
+      ? r.tags.filter((t) => t !== tag)
+      : [...(r.tags || []), tag];
+    await patchRoute(r.id, { tags }).catch((e) => setError(e.message));
+  }
 
   async function toggleMatch(r) {
     await patchRoute(r.id, { match: !r.match }).catch((e) => setError(e.message));
@@ -139,7 +148,8 @@ export default function Dashboard({ role, onOpen }) {
           <h2>Gallery routes</h2>
           <div className="route-admin-list">
             {routes.map((r) => (
-              <div key={r.id} className="route-admin-row">
+              <React.Fragment key={r.id}>
+              <div className="route-admin-row">
                 <img src={r.imageUrl} alt="" />
                 <div className="route-admin-info">
                   <strong>{r.title}</strong>
@@ -156,6 +166,12 @@ export default function Dashboard({ role, onOpen }) {
                   onClick={() => setGrade(r)}
                 >
                   ✎ grade
+                </button>
+                <button
+                  title="Edit style tags"
+                  onClick={() => setTagEditor(tagEditor === r.id ? null : r.id)}
+                >
+                  🏷 {r.tags?.length || 0}
                 </button>
                 <button
                   title="Toggle matching allowed"
@@ -179,6 +195,28 @@ export default function Dashboard({ role, onOpen }) {
                   ✕
                 </button>
               </div>
+              {tagEditor === r.id && (
+                <div className="tag-editor">
+                  {TAGS.map((t) => {
+                    const on = r.tags?.includes(t);
+                    return (
+                      <button
+                        key={t}
+                        className={`tag-chip ${on ? "on" : ""}`}
+                        style={
+                          on
+                            ? { borderColor: TAG_COLORS[t], color: TAG_COLORS[t] }
+                            : undefined
+                        }
+                        onClick={() => toggleTag(r, t)}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              </React.Fragment>
             ))}
           </div>
         </section>

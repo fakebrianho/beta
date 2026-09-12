@@ -1,6 +1,29 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
+import { TAG_COLORS } from "./tags.js";
+
+// "V6", "v5/6", "6" → 6; unparseable grades return null
+const gradeNum = (r) => {
+  const m = (r.displayGrade || r.grade || "").match(/(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : null;
+};
+
+function TagDots({ tags }) {
+  if (!tags?.length) return null;
+  return (
+    <span className="tag-dots">
+      {tags.map((t) => (
+        <span
+          key={t}
+          className="tag-dot"
+          style={{ background: TAG_COLORS[t] }}
+          title={t}
+        />
+      ))}
+    </span>
+  );
+}
 
 export default function Gallery({ user }) {
   const role = user?.role || null;
@@ -8,6 +31,15 @@ export default function Gallery({ user }) {
   const [openRoute, setOpenRoute] = useState(null); // full route with sends
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
+  const [gradeRange, setGradeRange] = useState([0, 17]);
+
+  const [lo, hi] = gradeRange;
+  const setLo = (v) => setGradeRange([Math.min(v, hi), hi]);
+  const setHi = (v) => setGradeRange([lo, Math.max(v, lo)]);
+  const filtered = routes.filter((r) => {
+    const g = gradeNum(r);
+    return g === null || (g >= lo && g <= hi); // ungraded routes always show
+  });
 
   const refresh = () =>
     api.listRoutes().then(setRoutes).catch((e) => setError(e.message));
@@ -29,13 +61,43 @@ export default function Gallery({ user }) {
           </button>
         )}
       </div>
+      <div className="grade-filter">
+        <span className="muted">
+          Grade: V{lo} – V{hi}
+        </span>
+        <div className="grade-sliders">
+          <input
+            type="range"
+            min={0}
+            max={17}
+            value={lo}
+            onChange={(e) => setLo(Number(e.target.value))}
+          />
+          <input
+            type="range"
+            min={0}
+            max={17}
+            value={hi}
+            onChange={(e) => setHi(Number(e.target.value))}
+          />
+        </div>
+        {(lo > 0 || hi < 17) && (
+          <button className="link-btn" onClick={() => setGradeRange([0, 17])}>
+            reset
+          </button>
+        )}
+      </div>
+
       {error && <p className="error">{error}</p>}
       {routes.length === 0 && (
         <p className="muted">No routes yet. Coaches can add one.</p>
       )}
+      {routes.length > 0 && filtered.length === 0 && (
+        <p className="muted">No routes between V{lo} and V{hi}.</p>
+      )}
 
       <div className="route-grid">
-        {routes.map((r) => (
+        {filtered.map((r) => (
           <div key={r.id} className="route-card" onClick={() => open(r.id)}>
             <img src={r.imageUrl} alt={r.title} loading="lazy" />
             <div className="route-card-overlay">
@@ -49,6 +111,7 @@ export default function Gallery({ user }) {
                 ) : (
                   <span className="badge fa">✓ FA · {r.faBy}</span>
                 )}
+                <TagDots tags={r.tags} />
                 {r.sendCount > 0 && (
                   <span className="badge">{r.sendCount} send{r.sendCount > 1 ? "s" : ""}</span>
                 )}
@@ -206,6 +269,19 @@ function RouteDetail({ route, user, onClose, onChanged }) {
                 </span>
               )}
             </div>
+            {route.tags?.length > 0 && (
+              <div className="tag-chips">
+                {route.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="tag-chip"
+                    style={{ borderColor: TAG_COLORS[t], color: TAG_COLORS[t] }}
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
             {route.notes && <p className="muted">{route.notes}</p>}
 
             <h4>Sends ({route.sends.length})</h4>

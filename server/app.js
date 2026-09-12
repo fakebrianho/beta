@@ -351,6 +351,11 @@ app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
 
 // ---- Gallery routes (public: no sign-in needed to browse or submit sends) ----
 
+const ROUTE_TAGS = [
+  "slopers", "crimps", "pinches", "dynamic", "static",
+  "deadpoint", "dropknee", "sit start", "powerful",
+];
+
 // Shown grade = average of the setter's proposed grade (numeric part of the
 // string, e.g. "V6" → 6) and every grade submitted with a send.
 function displayGrade(route, sendGrades) {
@@ -418,6 +423,8 @@ app.patch("/api/routes/:id", requireAuth, async (req, res) => {
   if ("gradeOverride" in req.body)
     route.gradeOverride = req.body.gradeOverride?.trim() || null;
   if ("match" in req.body) route.match = !!req.body.match;
+  if (Array.isArray(req.body.tags))
+    route.tags = req.body.tags.filter((t) => ROUTE_TAGS.includes(t));
   if (req.body.imageUrl && req.body.imageUrl !== route.imageUrl) {
     if (route.imageUrl?.startsWith("https://"))
       await del(route.imageUrl).catch(() => {});

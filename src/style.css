@@ -437,6 +437,75 @@ select {
 	filter: brightness(1.15);
 }
 
+/* grade filter */
+.grade-filter {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin: 4px 0 16px;
+}
+.grade-filter > .muted {
+	min-width: 110px;
+	font-variant-numeric: tabular-nums;
+}
+.grade-sliders {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1;
+	max-width: 320px;
+}
+.grade-sliders input[type='range'] {
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	border: none;
+	accent-color: var(--accent);
+}
+
+/* route tags */
+.tag-dots {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.tag-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	border: 1px solid #0009;
+	flex-shrink: 0;
+}
+.tag-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.tag-chip {
+	font-size: 0.75rem;
+	padding: 2px 10px;
+	border-radius: 20px;
+	background: transparent;
+	border: 1px solid #3a3f4a;
+	color: var(--muted);
+}
+.tag-editor {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	background: var(--panel-2);
+	border-radius: 10px;
+	padding: 10px 12px;
+	margin: -4px 0 4px;
+}
+.tag-editor .tag-chip {
+	cursor: pointer;
+}
+.tag-editor .tag-chip.on {
+	font-weight: 600;
+}
+
 /* leaderboard */
 .leaderboard {
 	max-width: 720px;
