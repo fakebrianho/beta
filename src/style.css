@@ -476,6 +476,16 @@ select {
 	border-radius: 50%;
 	border: 1px solid #0009;
 	flex-shrink: 0;
+	cursor: pointer;
+}
+.tag-filter {
+	margin-bottom: 16px;
+}
+.tag-filter .tag-chip {
+	cursor: pointer;
+}
+.tag-filter .tag-chip.on {
+	font-weight: 600;
 }
 .tag-chips {
 	display: flex;

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
-import { TAG_COLORS } from "./tags.js";
+import { TAGS, TAG_COLORS } from "./tags.js";
 
 // "V6", "v5/6", "6" → 6; unparseable grades return null
 const gradeNum = (r) => {
@@ -9,7 +9,7 @@ const gradeNum = (r) => {
   return m ? Number(m[1]) : null;
 };
 
-function TagDots({ tags }) {
+function TagDots({ tags, onTag }) {
   if (!tags?.length) return null;
   return (
     <span className="tag-dots">
@@ -18,7 +18,11 @@ function TagDots({ tags }) {
           key={t}
           className="tag-dot"
           style={{ background: TAG_COLORS[t] }}
-          title={t}
+          title={`${t} — click to filter`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTag?.(t);
+          }}
         />
       ))}
     </span>
@@ -32,14 +36,19 @@ export default function Gallery({ user }) {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [gradeRange, setGradeRange] = useState([0, 17]);
+  const [tagFilter, setTagFilter] = useState([]);
 
   const [lo, hi] = gradeRange;
   const setLo = (v) => setGradeRange([Math.min(v, hi), hi]);
   const setHi = (v) => setGradeRange([lo, Math.max(v, lo)]);
+  const toggleTagFilter = (t) =>
+    setTagFilter((f) => (f.includes(t) ? f.filter((x) => x !== t) : [...f, t]));
   const filtered = routes.filter((r) => {
     const g = gradeNum(r);
-    return g === null || (g >= lo && g <= hi); // ungraded routes always show
+    if (g !== null && (g < lo || g > hi)) return false; // ungraded routes always show
+    return tagFilter.every((t) => r.tags?.includes(t));
   });
+  const hasFilter = lo > 0 || hi < 17 || tagFilter.length > 0;
 
   const refresh = () =>
     api.listRoutes().then(setRoutes).catch((e) => setError(e.message));
@@ -81,11 +90,36 @@ export default function Gallery({ user }) {
             onChange={(e) => setHi(Number(e.target.value))}
           />
         </div>
-        {(lo > 0 || hi < 17) && (
-          <button className="link-btn" onClick={() => setGradeRange([0, 17])}>
+        {hasFilter && (
+          <button
+            className="link-btn"
+            onClick={() => {
+              setGradeRange([0, 17]);
+              setTagFilter([]);
+            }}
+          >
             reset
           </button>
         )}
+      </div>
+      <div className="tag-chips tag-filter">
+        {TAGS.map((t) => {
+          const on = tagFilter.includes(t);
+          return (
+            <button
+              key={t}
+              className={`tag-chip ${on ? "on" : ""}`}
+              style={
+                on
+                  ? { borderColor: TAG_COLORS[t], color: TAG_COLORS[t] }
+                  : undefined
+              }
+              onClick={() => toggleTagFilter(t)}
+            >
+              {t}
+            </button>
+          );
+        })}
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -93,7 +127,7 @@ export default function Gallery({ user }) {
         <p className="muted">No routes yet. Coaches can add one.</p>
       )}
       {routes.length > 0 && filtered.length === 0 && (
-        <p className="muted">No routes between V{lo} and V{hi}.</p>
+        <p className="muted">No routes match the current filters.</p>
       )}
 
       <div className="route-grid">
@@ -111,7 +145,7 @@ export default function Gallery({ user }) {
                 ) : (
                   <span className="badge fa">✓ FA · {r.faBy}</span>
                 )}
-                <TagDots tags={r.tags} />
+                <TagDots tags={r.tags} onTag={toggleTagFilter} />
                 {r.sendCount > 0 && (
                   <span className="badge">{r.sendCount} send{r.sendCount > 1 ? "s" : ""}</span>
                 )}
