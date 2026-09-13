@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
+import LazyVideo from "./LazyVideo.jsx";
+import { compressVideo, posterFrom, MAX_UPLOAD_MB, tooBig } from "./video.js";
 import { TAGS, TAG_COLORS } from "./tags.js";
 
 // "V6", "v5/6", "6" → 6; unparseable grades return null
@@ -273,6 +275,7 @@ function AddRouteModal({ onClose, onAdded }) {
 function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
   const signedIn = user != null;
   const [progress, setProgress] = useState(null);
+  const [stage, setStage] = useState("");
   const [error, setError] = useState("");
   const formRef = useRef(null);
 
@@ -291,10 +294,24 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
     setError("");
     try {
       await api.checkPasscode(passcode); // fail fast before the big upload
+
+      setStage("Compressing video…");
       setProgress(0);
-      const videoUrl = await api.uploadFile(file, setProgress, passcode);
+      const [clip, poster] = await Promise.all([
+        compressVideo(file, setProgress),
+        posterFrom(file),
+      ]);
+      if (clip.size > MAX_UPLOAD_MB * 1024 * 1024) throw tooBig(clip, clip === file);
+
+      setStage("Uploading…");
+      setProgress(0);
+      const videoUrl = await api.uploadFile(clip, setProgress, passcode);
+      const posterUrl = poster
+        ? await api.uploadFile(poster, null, passcode).catch(() => null)
+        : null;
       const { claimedFa } = await api.addSend(route.id, {
         videoUrl,
+        posterUrl,
         author,
         passcode,
         grade: grade === "" ? null : Number(grade),
@@ -307,6 +324,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
       setError(err.message);
     } finally {
       setProgress(null);
+      setStage("");
     }
   }
 
@@ -370,7 +388,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
             <div className="send-list">
               {route.sends.map((s) => (
                 <div key={s.id} className="send">
-                  <video src={s.videoUrl} controls preload="metadata" />
+                  <LazyVideo src={s.videoUrl} poster={s.posterUrl} />
                   <span className="muted">
                     {s.author}
                     {s.attempts != null &&
@@ -418,12 +436,13 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
                 />
               )}
               <label className="muted">
-                Did it? Upload your send video (required):
+                Did it? Upload your send video (required) — keep it under 30
+                seconds, it gets shrunk before uploading:
                 <input name="video" type="file" accept="video/*" required />
               </label>
               <button type="submit" disabled={progress !== null}>
                 {progress !== null
-                  ? `Uploading… ${Math.round(progress * 100)}%`
+                  ? `${stage} ${Math.round(progress * 100)}%`
                   : route.status === "bounty"
                     ? "Submit send & claim FA"
                     : "Submit send"}

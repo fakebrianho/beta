@@ -30,9 +30,9 @@ export const api = {
     });
     return blob.url;
   },
-  uploadVideo: async ({ file, title, notes }, onProgress) => {
+  uploadVideo: async ({ file, title, notes, posterUrl }, onProgress) => {
     const url = await api.uploadFile(file, onProgress);
-    return post("/api/videos", { title, notes, url });
+    return post("/api/videos", { title, notes, url, posterUrl });
   },
   // Gallery
   listRoutes: () => fetch("/api/routes").then(json),

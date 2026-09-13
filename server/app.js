@@ -27,6 +27,10 @@ const COACH_EMAILS = (process.env.COACH_EMAILS || "bh1525@nyu.edu")
 const roleFor = (email) =>
   COACH_EMAILS.includes(email.toLowerCase()) ? "coach" : "student";
 
+// Free-tier blob storage is 1GB total, so keep any single upload modest —
+// a compressed 30s send clip lands around 5MB.
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
 // Simple shared passcode gating anonymous gallery sends (and their uploads)
 const SEND_PASSCODE = process.env.SEND_PASSCODE || "sendit";
 const passcodeOk = (p) =>
@@ -273,11 +277,11 @@ app.post("/api/blob/upload", async (req, res) => {
           token: await issueSignedToken({
             pathname,
             operations: ["put"],
-            maximumSizeInBytes: 200 * 1024 * 1024,
+            maximumSizeInBytes: MAX_UPLOAD_BYTES,
             validUntil: Date.now() + 60 * 60 * 1000,
           }),
           urlOptions: {
-            maximumSizeInBytes: 200 * 1024 * 1024,
+            maximumSizeInBytes: MAX_UPLOAD_BYTES,
             addRandomSuffix: true,
             allowOverwrite: false,
           },
@@ -307,7 +311,7 @@ app.get("/api/videos", requireAuth, async (req, res) => {
 });
 
 app.post("/api/videos", requireAuth, async (req, res) => {
-  const { title, notes, url } = req.body;
+  const { title, notes, url, posterUrl } = req.body;
   if (!url) return res.status(400).json({ error: "No video URL" });
   const video = await Video.create({
     owner: req.user.id,
@@ -315,6 +319,7 @@ app.post("/api/videos", requireAuth, async (req, res) => {
     student: req.user.name,
     notes: notes || "",
     url,
+    posterUrl: posterUrl || null,
   });
   res.status(201).json(video);
 });
@@ -344,8 +349,8 @@ app.patch("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
 app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
   await Comment.deleteMany({ video: req.video.id });
   await req.video.deleteOne();
-  if (req.video.url?.startsWith("https://"))
-    await del(req.video.url).catch(() => {});
+  for (const u of [req.video.url, req.video.posterUrl])
+    if (u?.startsWith("https://")) await del(u).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -470,7 +475,11 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
   const sends = await Send.find({ route: route.id });
   await Send.deleteMany({ route: route.id });
   await route.deleteOne();
-  for (const u of [route.imageUrl, ...sends.map((s) => s.videoUrl)])
+  for (const u of [
+    route.imageUrl,
+    ...sends.map((s) => s.videoUrl),
+    ...sends.map((s) => s.posterUrl),
+  ])
     if (u?.startsWith("https://")) await del(u).catch(() => {});
   res.json({ ok: true });
 });
@@ -663,7 +672,7 @@ app.patch("/api/users/:id/points", requireAuth, async (req, res) => {
 app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
-  const { videoUrl, author, passcode, grade, attempts } = req.body;
+  const { videoUrl, posterUrl, author, passcode, grade, attempts } = req.body;
   if (!videoUrl) return res.status(400).json({ error: "A send video is required" });
   const user = await userFromReq(req);
   const name = user?.name || author?.trim(); // signed-in sends use the account name
@@ -694,6 +703,7 @@ app.post("/api/routes/:id/sends", async (req, res) => {
         })
       : 0,
     videoUrl,
+    posterUrl: posterUrl || null,
   });
   if (claimedFa) {
     route.status = "fa";

@@ -20,6 +20,7 @@ const videoSchema = new mongoose.Schema(
     student: String, // owner's display name, denormalized for listing
     notes: { type: String, default: "" },
     url: { type: String, required: true }, // Vercel Blob URL (or /uploads/... for legacy local files)
+    posterUrl: { type: String, default: null },
     status: { type: String, enum: ["submitted", "reviewed"], default: "submitted" },
   },
   { timestamps: true }
@@ -67,6 +68,7 @@ const sendSchema = new mongoose.Schema(
     fa: { type: Boolean, default: false }, // claimed the route's first ascent
     points: { type: Number, default: 0 }, // legacy snapshot; scores are computed live
     videoUrl: { type: String, required: true },
+    posterUrl: { type: String, default: null }, // thumbnail so browsing costs no video bytes
   },
   { timestamps: true }
 );

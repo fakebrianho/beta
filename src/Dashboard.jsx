@@ -2,12 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
 import { TAGS, TAG_COLORS } from "./tags.js";
+import { compressVideo, posterFrom, MAX_UPLOAD_MB, tooBig } from "./video.js";
 
 export default function Dashboard({ role, onOpen }) {
   const [videos, setVideos] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [tagEditor, setTagEditor] = useState(null); // route id with tag editor open
   const [progress, setProgress] = useState(null);
+  const [stage, setStage] = useState("");
   const [error, setError] = useState("");
   const formRef = useRef(null);
 
@@ -67,9 +69,26 @@ export default function Dashboard({ role, onOpen }) {
     const file = fd.get("video");
     if (!file?.name) return setError("Pick a video file first.");
     try {
+      setStage("Compressing video…");
       setProgress(0);
+      const [clip, poster] = await Promise.all([
+        compressVideo(file, setProgress),
+        posterFrom(file),
+      ]);
+      if (clip.size > MAX_UPLOAD_MB * 1024 * 1024)
+        throw tooBig(clip, clip === file);
+      setStage("Uploading…");
+      setProgress(0);
+      const posterUrl = poster
+        ? await api.uploadFile(poster).catch(() => null)
+        : null;
       await api.uploadVideo(
-        { file, title: fd.get("title"), notes: fd.get("notes") },
+        {
+          file: clip,
+          posterUrl,
+          title: fd.get("title"),
+          notes: fd.get("notes"),
+        },
         setProgress
       );
       formRef.current.reset();
@@ -78,6 +97,7 @@ export default function Dashboard({ role, onOpen }) {
       setError(err.message);
     } finally {
       setProgress(null);
+      setStage("");
     }
   }
 
@@ -102,7 +122,7 @@ export default function Dashboard({ role, onOpen }) {
             <input name="video" type="file" accept="video/*" />
             <button type="submit" disabled={progress !== null}>
               {progress !== null
-                ? `Uploading… ${Math.round(progress * 100)}%`
+                ? `${stage} ${Math.round(progress * 100)}%`
                 : "Upload"}
             </button>
           </form>
@@ -116,7 +136,7 @@ export default function Dashboard({ role, onOpen }) {
         <div className="video-grid">
           {videos.map((v) => (
             <div key={v.id} className="video-card" onClick={() => onOpen(v.id)}>
-              <video src={v.url} preload="metadata" muted />
+              <video src={v.url} preload="none" poster={v.posterUrl} muted />
               <div className="video-card-body">
                 <strong>{v.title}</strong>
                 <span className="muted">
