@@ -122,11 +122,21 @@ export default function Profile({ userId, onOpenRoute, onAvatarChange }) {
             {p.rank && ` · rank #${p.rank}`} · {p.sends.length} send
             {p.sends.length === 1 ? "" : "s"}
           </span>
-          {p.bounties > 0 && (
+          {(p.fas > 0 || p.bounties > 0) && (
             <div className="badges">
-              <span className="badge bounty" title="Bounties claimed off the setter">
-                💰 {p.bounties} bount{p.bounties === 1 ? "y" : "ies"} claimed
-              </span>
+              {p.fas > 0 && (
+                <span className="badge fa" title="First ascents">
+                  🥇 {p.fas} FA{p.fas === 1 ? "" : "s"}
+                </span>
+              )}
+              {p.bounties > 0 && (
+                <span
+                  className="badge bounty"
+                  title="Sent it before the setter did"
+                >
+                  💰 {p.bounties} bount{p.bounties === 1 ? "y" : "ies"} claimed
+                </span>
+              )}
             </div>
           )}
           {p.isSelf && p.avatarUrl && (

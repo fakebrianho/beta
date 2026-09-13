@@ -71,6 +71,7 @@ const sendSchema = new mongoose.Schema(
     grade: { type: Number, min: 0, max: 17, default: null }, // sender's V-grade opinion
     attempts: { type: Number, min: 1, default: null },
     fa: { type: Boolean, default: false }, // claimed the route's first ascent
+    bounty: { type: Boolean, default: false }, // ...and beat the setter to it
     points: { type: Number, default: 0 }, // legacy snapshot; scores are computed live
     videoUrl: { type: String, required: true },
     posterUrl: { type: String, default: null }, // thumbnail so browsing costs no video bytes

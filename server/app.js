@@ -621,7 +621,8 @@ async function buildProfile(user, isSelf) {
     joined: user.createdAt,
     points: row?.points || 0,
     rank: row?.rank || null,
-    bounties: sends.filter((s) => s.fa).length, // bounties claimed off the setter
+    bounties: sends.filter((s) => s.bounty).length, // beat the setter to it
+    fas: sends.filter((s) => s.fa).length,
     isSelf,
     sends: sends
       .filter((s) => routeById[s.route.toString()])
@@ -706,11 +707,12 @@ app.post("/api/routes/:id/sends", async (req, res) => {
   if (!Number.isFinite(tries) || tries < 1)
     return res.status(400).json({ error: "How many attempts did it take?" });
   const g = Number(grade);
-  // The setter can't claim a bounty on their own problem — their send just
-  // supplies the beta. Anyone else sending an unproven route takes the FA.
+  // The FA goes to the first non-setter to send it, whether or not the setter
+  // has posted beta. It only counts as claiming a bounty when the setter
+  // hadn't shown it goes first.
   const isSetter = user?.role === "coach";
-  const openBounty = !route.betaVideoUrl && !route.faBy;
-  const claimedFa = openBounty && !isSetter;
+  const claimedFa = !isSetter && !route.faBy;
+  const claimedBounty = claimedFa && !route.betaVideoUrl;
   const sendGrade = Number.isFinite(g) && g >= 0 && g <= 17 ? g : null;
   const allGrades = (await Send.find({ route: route.id }).select("grade"))
     .map((s) => s.grade)
@@ -722,6 +724,7 @@ app.post("/api/routes/:id/sends", async (req, res) => {
     grade: sendGrade,
     attempts: tries,
     fa: claimedFa,
+    bounty: claimedBounty,
     points: user
       ? scoreSend({
           grade: gradeValue(route, allGrades),
@@ -732,19 +735,25 @@ app.post("/api/routes/:id/sends", async (req, res) => {
     videoUrl,
     posterUrl: posterUrl || null,
   });
-  // Whoever first proves the route goes also supplies its beta video
-  if (openBounty) {
-    if (claimedFa) {
-      route.faBy = send.author;
-      route.faAt = new Date();
-    }
+  let changed = false;
+  if (claimedFa) {
+    route.faBy = send.author;
+    route.faAt = new Date();
+    changed = true;
+  }
+  // The route's beta is whichever video landed first — a setter upload always
+  // wins, otherwise the FA's send fills the slot.
+  if (!route.betaVideoUrl) {
     route.betaVideoUrl = send.videoUrl;
     route.betaPosterUrl = send.posterUrl;
     route.betaBy = send.author;
+    changed = true;
+  }
+  if (changed) {
     syncStatus(route);
     await route.save();
   }
-  res.status(201).json({ send, route, claimedFa });
+  res.status(201).json({ send, route, claimedFa, claimedBounty });
 });
 
 // ---- Comments (timestamped, optional drawing payload) ----

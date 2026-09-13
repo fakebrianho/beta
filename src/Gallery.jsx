@@ -326,7 +326,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
       const posterUrl = poster
         ? await api.uploadFile(poster, null, passcode).catch(() => null)
         : null;
-      const { claimedFa } = await api.addSend(route.id, {
+      const { claimedFa, claimedBounty } = await api.addSend(route.id, {
         videoUrl,
         posterUrl,
         author,
@@ -334,7 +334,8 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
         grade: grade === "" ? null : Number(grade),
         attempts: Number(attempts),
       });
-      if (claimedFa) alert("🎉 First ascent — you mogged the setter!");
+      if (claimedBounty) alert("🎉 First ascent — you mogged the setter!");
+      else if (claimedFa) alert("🎉 First ascent! Your name's on it.");
       formRef.current.reset();
       onChanged();
     } catch (err) {
@@ -411,7 +412,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
             ) : (
               <p className="muted">
                 💰 No beta yet — the setter hasn't shown this one goes. Send it
-                and the FA is yours.
+                and both the FA and the beta are yours.
               </p>
             )}
 
