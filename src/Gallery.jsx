@@ -11,6 +11,26 @@ const gradeNum = (r) => {
   return m ? Number(m[1]) : null;
 };
 
+// bounty = unproven, sent = setter posted beta (no FA), fa = someone beat the setter
+export function StatusBadge({ route, long }) {
+  if (route.status === "bounty")
+    return (
+      <span className="badge bounty">
+        💰 Bounty{long ? " — nobody's done it" : ""}
+      </span>
+    );
+  if (route.status === "fa")
+    return (
+      <span className="badge fa">
+        ✓ FA · {route.faBy}
+        {long && route.faAt
+          ? ` · ${new Date(route.faAt).toLocaleDateString()}`
+          : ""}
+      </span>
+    );
+  return <span className="badge beta">🎬 beta</span>;
+}
+
 function TagDots({ tags, onTag }) {
   if (!tags?.length) return null;
   return (
@@ -171,11 +191,7 @@ export default function Gallery({
               </strong>
               <div className="badges">
                 <span className="badge grade">{r.displayGrade || r.grade}</span>
-                {r.status === "bounty" ? (
-                  <span className="badge bounty">💰 Bounty</span>
-                ) : (
-                  <span className="badge fa">✓ FA · {r.faBy}</span>
-                )}
+                <StatusBadge route={r} />
                 <TagDots tags={r.tags} onTag={toggleTagFilter} />
                 {r.sendCount > 0 && (
                   <span className="badge">{r.sendCount} send{r.sendCount > 1 ? "s" : ""}</span>
@@ -277,6 +293,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
   const [progress, setProgress] = useState(null);
   const [stage, setStage] = useState("");
   const [error, setError] = useState("");
+  const [showBeta, setShowBeta] = useState(false);
   const formRef = useRef(null);
 
   async function submitSend(e) {
@@ -317,7 +334,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
         grade: grade === "" ? null : Number(grade),
         attempts: Number(attempts),
       });
-      if (claimedFa) alert("🎉 First ascent! The bounty is yours.");
+      if (claimedFa) alert("🎉 First ascent — you mogged the setter!");
       formRef.current.reset();
       onChanged();
     } catch (err) {
@@ -355,14 +372,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
               <span className="badge grade" title={`Proposed: ${route.grade}`}>
                 {route.displayGrade || route.grade}
               </span>
-              {route.status === "bounty" ? (
-                <span className="badge bounty">💰 Bounty — unclaimed</span>
-              ) : (
-                <span className="badge fa">
-                  ✓ FA by {route.faBy}
-                  {route.faAt && ` · ${new Date(route.faAt).toLocaleDateString()}`}
-                </span>
-              )}
+              <StatusBadge route={route} long />
             </div>
             {route.tags?.length > 0 && (
               <div className="tag-chips">
@@ -378,6 +388,32 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
               </div>
             )}
             {route.notes && <p className="muted">{route.notes}</p>}
+
+            {route.betaVideoUrl ? (
+              <div className={`beta-panel ${showBeta ? "open" : ""}`}>
+                <button
+                  className="beta-toggle"
+                  onClick={() => setShowBeta(!showBeta)}
+                  aria-expanded={showBeta}
+                >
+                  <span>
+                    🎬 Beta video{route.betaBy ? ` · ${route.betaBy}` : ""}
+                  </span>
+                  <span className="faq-chevron">{showBeta ? "−" : "+"}</span>
+                </button>
+                {showBeta && (
+                  <LazyVideo
+                    src={route.betaVideoUrl}
+                    poster={route.betaPosterUrl}
+                  />
+                )}
+              </div>
+            ) : (
+              <p className="muted">
+                💰 No beta yet — the setter hasn't shown this one goes. Send it
+                and the FA is yours.
+              </p>
+            )}
 
             <h4>Sends ({route.sends.length})</h4>
             {route.sends.length === 0 && (

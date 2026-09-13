@@ -56,6 +56,42 @@ export default function Dashboard({ role, onOpen }) {
     }
   }
 
+  // Posting beta proves the route goes, so the bounty comes off it
+  async function uploadBeta(r, file) {
+    if (!file) return;
+    setError("");
+    setStage(`Compressing beta for ${r.title}…`);
+    setProgress(0);
+    try {
+      const [clip, poster] = await Promise.all([
+        compressVideo(file, setProgress),
+        posterFrom(file),
+      ]);
+      if (clip.size > MAX_UPLOAD_MB * 1024 * 1024)
+        throw tooBig(clip, clip === file);
+      setStage("Uploading beta…");
+      setProgress(0);
+      const betaVideoUrl = await api.uploadFile(clip, setProgress);
+      const betaPosterUrl = poster
+        ? await api.uploadFile(poster).catch(() => null)
+        : null;
+      await patchRoute(r.id, { betaVideoUrl, betaPosterUrl });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setProgress(null);
+      setStage("");
+    }
+  }
+
+  async function clearBeta(r) {
+    if (!confirm(`Remove your beta for "${r.title}" and put the bounty back?`))
+      return;
+    await patchRoute(r.id, { betaVideoUrl: null, betaPosterUrl: null }).catch(
+      (e) => setError(e.message)
+    );
+  }
+
   async function deleteRoute(id) {
     if (!confirm("Delete this route and its send videos?")) return;
     await api.deleteRoute(id);
@@ -166,6 +202,12 @@ export default function Dashboard({ role, onOpen }) {
       {role === "coach" && routes.length > 0 && (
         <section className="route-admin">
           <h2>Gallery routes</h2>
+          {progress !== null && (
+            <p className="muted">
+              {stage} {Math.round(progress * 100)}%
+            </p>
+          )}
+          {error && <p className="error">{error}</p>}
           <div className="route-admin-list">
             {routes.map((r) => (
               <React.Fragment key={r.id}>
@@ -177,8 +219,12 @@ export default function Dashboard({ role, onOpen }) {
                     {r.displayGrade || r.grade}
                     {r.gradeOverride && " (set by you)"} ·{" "}
                     {r.match ? "match" : "no match"} ·{" "}
-                    {r.status === "bounty" ? "💰 bounty" : `✓ FA by ${r.faBy}`} ·{" "}
-                    {r.sendCount} send{r.sendCount === 1 ? "" : "s"}
+                    {r.status === "bounty"
+                      ? "💰 bounty"
+                      : r.status === "fa"
+                        ? `✓ FA by ${r.faBy}`
+                        : "🎬 your beta"}{" "}
+                    · {r.sendCount} send{r.sendCount === 1 ? "" : "s"}
                   </span>
                 </div>
                 <button
@@ -211,6 +257,33 @@ export default function Dashboard({ role, onOpen }) {
                     }}
                   />
                 </label>
+                <label
+                  className="photo-btn"
+                  title={
+                    r.betaVideoUrl
+                      ? "Replace the beta video"
+                      : "Upload your beta — clears the bounty"
+                  }
+                >
+                  🎬{r.betaVideoUrl ? "✓" : ""}
+                  <input
+                    type="file"
+                    accept="video/*"
+                    hidden
+                    onChange={(e) => {
+                      uploadBeta(r, e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {r.status === "sent" && (
+                  <button
+                    title="Remove your beta and restore the bounty"
+                    onClick={() => clearBeta(r)}
+                  >
+                    ↩︎
+                  </button>
+                )}
                 <button className="delete-btn" onClick={() => deleteRoute(r.id)}>
                   ✕
                 </button>

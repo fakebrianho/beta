@@ -121,9 +121,14 @@ export default function Profile({ userId, onOpenRoute, onAvatarChange }) {
             {p.points.toLocaleString()} pts
             {p.rank && ` · rank #${p.rank}`} · {p.sends.length} send
             {p.sends.length === 1 ? "" : "s"}
-            {p.sends.some((s) => s.fa) &&
-              ` · ${p.sends.filter((s) => s.fa).length} FA`}
           </span>
+          {p.bounties > 0 && (
+            <div className="badges">
+              <span className="badge bounty" title="Bounties claimed off the setter">
+                💰 {p.bounties} bount{p.bounties === 1 ? "y" : "ies"} claimed
+              </span>
+            </div>
+          )}
           {p.isSelf && p.avatarUrl && (
             <button className="link-btn" onClick={removeAvatar} disabled={busy}>
               remove photo

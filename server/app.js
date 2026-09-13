@@ -356,6 +356,12 @@ app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
 
 // ---- Gallery routes (public: no sign-in needed to browse or submit sends) ----
 
+// Bounty = nobody has proven it goes yet. Setter beta clears the bounty
+// without an FA; a non-setter send takes the FA.
+function syncStatus(route) {
+  route.status = route.faBy ? "fa" : route.betaVideoUrl ? "sent" : "bounty";
+}
+
 const ROUTE_TAGS = [
   "slopers", "crimps", "pinches", "dynamic", "static",
   "deadpoint", "dropknee", "sit start", "powerful",
@@ -458,6 +464,20 @@ app.patch("/api/routes/:id", requireAuth, async (req, res) => {
       await del(route.imageUrl).catch(() => {});
     route.imageUrl = req.body.imageUrl;
   }
+  // Setter posting beta proves the route goes, so the bounty is off — but
+  // nobody gets the FA for it.
+  if ("betaVideoUrl" in req.body) {
+    const next = req.body.betaVideoUrl?.trim() || null;
+    const isSendVideo = await Send.exists({ videoUrl: route.betaVideoUrl });
+    if (route.betaVideoUrl && route.betaVideoUrl !== next && !isSendVideo) {
+      await del(route.betaVideoUrl).catch(() => {});
+      if (route.betaPosterUrl) await del(route.betaPosterUrl).catch(() => {});
+    }
+    route.betaVideoUrl = next;
+    route.betaPosterUrl = req.body.betaPosterUrl?.trim() || null;
+    route.betaBy = next ? req.user.name : null;
+    syncStatus(route);
+  }
   if (req.body.title) route.title = req.body.title;
   await route.save();
   const sends = await Send.find({ route: route.id });
@@ -477,6 +497,8 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
   await route.deleteOne();
   for (const u of [
     route.imageUrl,
+    route.betaVideoUrl,
+    route.betaPosterUrl,
     ...sends.map((s) => s.videoUrl),
     ...sends.map((s) => s.posterUrl),
   ])
@@ -599,6 +621,7 @@ async function buildProfile(user, isSelf) {
     joined: user.createdAt,
     points: row?.points || 0,
     rank: row?.rank || null,
+    bounties: sends.filter((s) => s.fa).length, // bounties claimed off the setter
     isSelf,
     sends: sends
       .filter((s) => routeById[s.route.toString()])
@@ -683,7 +706,11 @@ app.post("/api/routes/:id/sends", async (req, res) => {
   if (!Number.isFinite(tries) || tries < 1)
     return res.status(400).json({ error: "How many attempts did it take?" });
   const g = Number(grade);
-  const claimedFa = route.status === "bounty";
+  // The setter can't claim a bounty on their own problem — their send just
+  // supplies the beta. Anyone else sending an unproven route takes the FA.
+  const isSetter = user?.role === "coach";
+  const openBounty = !route.betaVideoUrl && !route.faBy;
+  const claimedFa = openBounty && !isSetter;
   const sendGrade = Number.isFinite(g) && g >= 0 && g <= 17 ? g : null;
   const allGrades = (await Send.find({ route: route.id }).select("grade"))
     .map((s) => s.grade)
@@ -705,10 +732,16 @@ app.post("/api/routes/:id/sends", async (req, res) => {
     videoUrl,
     posterUrl: posterUrl || null,
   });
-  if (claimedFa) {
-    route.status = "fa";
-    route.faBy = send.author;
-    route.faAt = new Date();
+  // Whoever first proves the route goes also supplies its beta video
+  if (openBounty) {
+    if (claimedFa) {
+      route.faBy = send.author;
+      route.faAt = new Date();
+    }
+    route.betaVideoUrl = send.videoUrl;
+    route.betaPosterUrl = send.posterUrl;
+    route.betaBy = send.author;
+    syncStatus(route);
     await route.save();
   }
   res.status(201).json({ send, route, claimedFa });

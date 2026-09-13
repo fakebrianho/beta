@@ -50,9 +50,14 @@ const routeSchema = new mongoose.Schema(
     match: { type: Boolean, default: true }, // matching holds allowed?
     imageUrl: { type: String, required: true }, // vertical hero image (Blob URL)
     notes: { type: String, default: "" },
-    status: { type: String, enum: ["bounty", "fa"], default: "bounty" },
-    faBy: { type: String, default: null }, // name of first ascensionist
+    // A route is a bounty until someone proves it goes: the setter posting
+    // beta clears the bounty (no FA), a non-setter sending it takes the FA.
+    status: { type: String, enum: ["bounty", "sent", "fa"], default: "bounty" },
+    faBy: { type: String, default: null }, // first ascensionist (never the setter)
     faAt: { type: Date, default: null },
+    betaVideoUrl: { type: String, default: null },
+    betaPosterUrl: { type: String, default: null },
+    betaBy: { type: String, default: null },
   },
   { timestamps: true }
 );

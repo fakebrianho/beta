@@ -302,6 +302,36 @@ select {
 	background: #143a1d;
 	color: #34c759;
 }
+.badge.beta {
+	background: #24262d;
+	color: var(--muted);
+}
+
+/* beta video dropdown on a route */
+.beta-panel {
+	background: var(--panel-2);
+	border-radius: 10px;
+	overflow: hidden;
+}
+.beta-toggle {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	background: transparent;
+	border-radius: 0;
+	padding: 12px 14px;
+	font-weight: 600;
+	text-align: left;
+}
+.beta-panel .lazy-video,
+.beta-panel video {
+	width: 100%;
+	display: block;
+	background: #000;
+	border-radius: 0;
+}
 
 .modal-backdrop {
 	position: fixed;
