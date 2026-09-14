@@ -367,18 +367,18 @@ const ROUTE_TAGS = [
   "deadpoint", "dropknee", "sit start", "powerful",
 ];
 
-// Shown grade = average of the setter's proposed grade (numeric part of the
-// string, e.g. "V6" → 6) and every grade submitted with a send.
-function displayGrade(route, sendGrades) {
-  if (route.gradeOverride) return route.gradeOverride; // coach has final say
-  const m = (route.grade || "").match(/(\d+(?:\.\d+)?)/);
-  const grades = [
-    ...(m ? [Number(m[1])] : []),
-    ...sendGrades.filter((g) => typeof g === "number"),
-  ];
-  if (!grades.length) return route.grade || "?";
-  const avg = grades.reduce((a, b) => a + b, 0) / grades.length;
-  return `V${Math.round(avg * 2) / 2}`;
+// The setter owns the grade outright. Senders' opinions are recorded and
+// shown, but only as advice for the setter to moderate with.
+function displayGrade(route) {
+  return route.gradeOverride || route.grade || "?";
+}
+
+// Advisory only: what the people who sent it thought
+function suggestedGrade(sendGrades) {
+  const gs = sendGrades.filter((g) => typeof g === "number");
+  if (!gs.length) return null;
+  const avg = gs.reduce((a, b) => a + b, 0) / gs.length;
+  return { avg: Math.round(avg * 2) / 2, count: gs.length };
 }
 
 app.get("/api/routes", async (req, res) => {
@@ -394,7 +394,8 @@ app.get("/api/routes", async (req, res) => {
     routes.map((r) => ({
       ...r.toJSON(),
       sendCount: byId[r.id]?.n || 0,
-      displayGrade: displayGrade(r, byId[r.id]?.grades || []),
+      displayGrade: displayGrade(r),
+      suggested: suggestedGrade(byId[r.id]?.grades || []),
       favorited: faves.has(r.id),
     }))
   );
@@ -433,11 +434,12 @@ app.get("/api/routes/:id", async (req, res) => {
   if (!route) return res.status(404).json({ error: "Not found" });
   const sends = await Send.find({ route: route.id }).sort({ createdAt: 1 });
   const grades = sends.map((s) => s.grade);
-  const gv = gradeValue(route, grades);
+  const gv = gradeValue(route);
   const viewer = await userFromReq(req);
   res.json({
     ...route.toJSON(),
-    displayGrade: displayGrade(route, grades),
+    displayGrade: displayGrade(route),
+    suggested: suggestedGrade(grades),
     favorited: !!viewer?.favorites.some((f) => f.equals(route._id)),
     sends: sends.map((s) => ({
       ...s.toJSON(),
@@ -483,7 +485,8 @@ app.patch("/api/routes/:id", requireAuth, async (req, res) => {
   const sends = await Send.find({ route: route.id });
   res.json({
     ...route.toJSON(),
-    displayGrade: displayGrade(route, sends.map((s) => s.grade)),
+    displayGrade: displayGrade(route),
+    suggested: suggestedGrade(sends.map((s) => s.grade)),
   });
 });
 
@@ -522,9 +525,9 @@ function scoreSend({ grade, attempts, fa }) {
   return Math.max(0, Math.round(pts));
 }
 
-// Numeric form of a route's shown grade ("V4.5" → 4.5)
-function gradeValue(route, sendGrades) {
-  const m = String(displayGrade(route, sendGrades)).match(/(\d+(?:\.\d+)?)/);
+// Numeric form of a route's grade ("V4/5" → 4), used for scoring
+function gradeValue(route) {
+  const m = String(displayGrade(route)).match(/(\d+(?:\.\d+)?)/);
   return m ? Number(m[1]) : 0;
 }
 
@@ -537,14 +540,8 @@ async function leaderboardRows() {
     Send.find({ user: { $ne: null } }),
   ]);
 
-  const sendsByRoute = {};
-  for (const s of sends) (sendsByRoute[s.route.toString()] ||= []).push(s);
   const gradeByRoute = {};
-  for (const r of routes)
-    gradeByRoute[r.id] = gradeValue(
-      r,
-      (sendsByRoute[r.id] || []).map((s) => s.grade)
-    );
+  for (const r of routes) gradeByRoute[r.id] = gradeValue(r);
 
   const byUser = new Map(
     users.map((u) => [
@@ -593,11 +590,6 @@ async function buildProfile(user, isSelf) {
     ]),
   ];
   const routes = await Route.find({ _id: { $in: wanted } });
-  const gradeSends = await Send.find({ route: { $in: wanted } }).select(
-    "route grade"
-  );
-  const byRoute = {};
-  for (const s of gradeSends) (byRoute[s.route.toString()] ||= []).push(s.grade);
 
   const summary = (r) => ({
     id: r.id,
@@ -606,11 +598,10 @@ async function buildProfile(user, isSelf) {
     status: r.status,
     match: r.match,
     tags: r.tags,
-    displayGrade: displayGrade(r, byRoute[r.id] || []),
+    displayGrade: displayGrade(r),
   });
   const routeById = Object.fromEntries(routes.map((r) => [r.id, r]));
-  const gradeOf = (id) =>
-    routeById[id] ? gradeValue(routeById[id], byRoute[id] || []) : 0;
+  const gradeOf = (id) => (routeById[id] ? gradeValue(routeById[id]) : 0);
 
   const row = (await leaderboardRows()).find((r) => r.id === user.id);
   return {
@@ -714,9 +705,6 @@ app.post("/api/routes/:id/sends", async (req, res) => {
   const claimedFa = !isSetter && !route.faBy;
   const claimedBounty = claimedFa && !route.betaVideoUrl;
   const sendGrade = Number.isFinite(g) && g >= 0 && g <= 17 ? g : null;
-  const allGrades = (await Send.find({ route: route.id }).select("grade"))
-    .map((s) => s.grade)
-    .concat(sendGrade);
   const send = await Send.create({
     route: route.id,
     user: user?.id || null,
@@ -727,7 +715,7 @@ app.post("/api/routes/:id/sends", async (req, res) => {
     bounty: claimedBounty,
     points: user
       ? scoreSend({
-          grade: gradeValue(route, allGrades),
+          grade: gradeValue(route),
           attempts: tries,
           fa: claimedFa,
         })

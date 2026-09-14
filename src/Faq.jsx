@@ -23,7 +23,7 @@ const FAQS = [
 	},
 	{
 		q: 'How are grades decided?',
-		a: "The grade shown on a route is the average of the setter's proposed grade and every grade submitted with a send. Think the grade is soft? Submit your send with your own grade opinion and move the needle.",
+		a: "The setter sets the grade. When you submit a send you can still say what you thought it was, and that shows up next to the route as what senders say, but it doesn't change the grade on its own. If enough people say a route is soft or sandbagged the setter will regrade it.",
 	},
 	{
 		q: 'Do I need an account?',

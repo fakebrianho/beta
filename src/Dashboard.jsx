@@ -21,7 +21,11 @@ export default function Dashboard({ role, onOpen }) {
 
   async function setGrade(r) {
     const g = prompt(
-      `Final grade for "${r.title}" (e.g. V7).\nThis overrides the community average. Leave empty to go back to averaging.`,
+      `Grade for "${r.title}" (e.g. V7).` +
+        (r.suggested
+          ? `\nSenders say V${r.suggested.avg} (${r.suggested.count} opinion${r.suggested.count === 1 ? "" : "s"}).`
+          : "") +
+        `\nLeave empty to fall back to the original "${r.grade}".`,
       r.gradeOverride || ""
     );
     if (g === null) return;
@@ -217,7 +221,7 @@ export default function Dashboard({ role, onOpen }) {
                   <strong>{r.title}</strong>
                   <span className="muted">
                     {r.displayGrade || r.grade}
-                    {r.gradeOverride && " (set by you)"} ·{" "}
+                    {r.suggested && ` (senders say V${r.suggested.avg} ×${r.suggested.count})`} ·{" "}
                     {r.match ? "match" : "no match"} ·{" "}
                     {r.status === "bounty"
                       ? "💰 bounty"

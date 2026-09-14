@@ -370,9 +370,17 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
               )}
             </h3>
             <div className="badges">
-              <span className="badge grade" title={`Proposed: ${route.grade}`}>
+              <span className="badge grade" title="Set by the setter">
                 {route.displayGrade || route.grade}
               </span>
+              {route.suggested && (
+                <span
+                  className="badge"
+                  title={`What ${route.suggested.count} sender${route.suggested.count === 1 ? "" : "s"} thought — advisory only`}
+                >
+                  senders say V{route.suggested.avg}
+                </span>
+              )}
               <StatusBadge route={route} long />
             </div>
             {route.tags?.length > 0 && (
@@ -457,7 +465,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
                 required
               />
               <select name="grade" defaultValue="">
-                <option value="">Your grade opinion (optional)</option>
+                <option value="">What did you think it was? (optional)</option>
                 {Array.from({ length: 18 }, (_, i) => (
                   <option key={i} value={i}>
                     V{i}
