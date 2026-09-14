@@ -294,6 +294,7 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
   const [stage, setStage] = useState("");
   const [error, setError] = useState("");
   const [showBeta, setShowBeta] = useState(false);
+  const [sendGrade, setSendGrade] = useState(null); // no default — V0 is a real answer
   const formRef = useRef(null);
 
   async function submitSend(e) {
@@ -302,7 +303,6 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
     const file = fd.get("video");
     const author = user?.name || (fd.get("author") || "").trim();
     const passcode = (fd.get("passcode") || "").trim();
-    const grade = fd.get("grade");
     const attempts = fd.get("attempts");
     if (!file?.name) return setError("A send video is required.");
     if (!author) return setError("Add your name.");
@@ -331,12 +331,13 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
         posterUrl,
         author,
         passcode,
-        grade: grade === "" ? null : Number(grade),
+        grade: sendGrade,
         attempts: Number(attempts),
       });
       if (claimedBounty) alert("🎉 First ascent — you mogged the setter!");
       else if (claimedFa) alert("🎉 First ascent! Your name's on it.");
       formRef.current.reset();
+      setSendGrade(null); // form.reset() doesn't touch React state
       onChanged();
     } catch (err) {
       setError(err.message);
@@ -464,14 +465,24 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
                 placeholder="Attempts it took (1 = flash)"
                 required
               />
-              <select name="grade" defaultValue="">
-                <option value="">What did you think it was? (optional)</option>
-                {Array.from({ length: 18 }, (_, i) => (
-                  <option key={i} value={i}>
-                    V{i}
-                  </option>
-                ))}
-              </select>
+              <div className="grade-picker">
+                <span className="muted">
+                  What did you think it was?{" "}
+                  {sendGrade === null ? "(optional)" : `— V${sendGrade}`}
+                </span>
+                <div className="grade-chips">
+                  {Array.from({ length: 18 }, (_, i) => (
+                    <button
+                      type="button"
+                      key={i}
+                      className={`grade-chip ${sendGrade === i ? "on" : ""}`}
+                      onClick={() => setSendGrade(sendGrade === i ? null : i)}
+                    >
+                      V{i}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {!signedIn && (
                 <input
                   name="passcode"

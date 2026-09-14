@@ -461,6 +461,31 @@ select {
 	flex-direction: column;
 	gap: 8px;
 }
+.grade-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.grade-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+}
+.grade-chip {
+	background: var(--panel-2);
+	border: 1px solid #3a3f4a;
+	border-radius: 16px;
+	padding: 5px 11px;
+	font-size: 0.8rem;
+	color: var(--muted);
+	min-width: 44px;
+}
+.grade-chip.on {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+	font-weight: 600;
+}
 .send-form input.locked {
 	opacity: 0.55;
 	cursor: not-allowed;
