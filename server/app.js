@@ -698,15 +698,22 @@ app.post("/api/routes/:id/sends", async (req, res) => {
   if (!Number.isFinite(tries) || tries < 1)
     return res.status(400).json({ error: "How many attempts did it take?" });
   const g = Number(grade);
-  // First ascent means first: only the very first send on a route can claim
-  // it, and only if that sender isn't the setter. Checking route.faBy alone
-  // wasn't enough — on a route the setter had sent, faBy stayed null and a
-  // late sender could grab an FA ahead of people who sent it weeks earlier.
+  // The FA belongs to the first non-setter to send it. A setter send doesn't
+  // take the FA, but it does prove the route goes, so the bounty is gone.
+  // The bounty needs a route nobody has touched: no sends at all, no setter
+  // beta.
   const isSetter = user?.role === "coach";
-  const priorSends = await Send.countDocuments({ route: route.id });
-  const claimedFa = !isSetter && priorSends === 0 && !route.faBy;
-  // Posting beta doesn't block the FA, but it does mean no bounty was claimed
-  const claimedBounty = claimedFa && !route.betaVideoUrl;
+  const coachIds = (await User.find({ role: "coach" }).select("_id")).map(
+    (u) => u._id
+  );
+  const prior = await Send.find({ route: route.id }).select("user");
+  const priorByOthers = prior.filter(
+    (s) => !s.user || !coachIds.some((c) => c.equals(s.user))
+  ).length;
+
+  const claimedFa = !isSetter && !route.faBy && priorByOthers === 0;
+  const claimedBounty =
+    claimedFa && prior.length === 0 && !route.betaVideoUrl;
   const sendGrade = Number.isFinite(g) && g >= 0 && g <= 17 ? g : null;
   const send = await Send.create({
     route: route.id,
