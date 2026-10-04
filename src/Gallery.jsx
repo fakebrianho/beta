@@ -265,6 +265,9 @@ function AddRouteModal({ onClose, onAdded }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
         <h3>Add a route</h3>
         <form ref={formRef} onSubmit={submit}>
           <input name="title" placeholder="Route name" required />
@@ -353,7 +356,9 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal route-detail" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose}>✕</button>
+        <button className="modal-close" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
         <div className="route-detail-layout">
           <img className="route-hero" src={route.imageUrl} alt={route.title} />
           <div className="route-info">

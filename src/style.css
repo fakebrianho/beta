@@ -372,13 +372,30 @@ select {
 	flex-direction: column;
 	gap: 6px;
 }
+/* Sticky rather than absolute so it stays reachable while the modal scrolls;
+   the negative bottom margin keeps it overlaying the content instead of
+   taking a row of its own. */
 .modal-close {
-	position: absolute;
-	top: 10px;
-	right: 10px;
-	background: transparent;
-	color: var(--muted);
-	padding: 4px 8px;
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	display: block;
+	margin-left: auto;
+	margin-bottom: -44px;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.6);
+	border: 1px solid #ffffff40;
+	color: #fff;
+	font-size: 1.15rem;
+	line-height: 1;
+	backdrop-filter: blur(4px);
+}
+.modal-close:hover {
+	background: rgba(0, 0, 0, 0.8);
+	border-color: #ffffff80;
 }
 .modal.route-detail {
 	max-width: 560px;
@@ -496,7 +513,9 @@ select {
 	opacity: 0.55;
 	cursor: not-allowed;
 }
-.send-form button {
+/* scoped to submit: a bare `.send-form button` also caught the grade chips,
+   painting all 18 of them accent blue as though every grade were selected */
+.send-form button[type='submit'] {
 	background: var(--accent);
 	align-self: flex-start;
 }
