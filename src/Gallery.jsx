@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
 import LazyVideo from "./LazyVideo.jsx";
+import useScrollLock from "./useScrollLock.js";
 import { compressVideo, posterFrom, MAX_UPLOAD_MB, tooBig } from "./video.js";
 import { TAGS, TAG_COLORS } from "./tags.js";
 
@@ -229,6 +230,7 @@ export default function Gallery({
 }
 
 function AddRouteModal({ onClose, onAdded }) {
+  useScrollLock();
   const formRef = useRef(null);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
@@ -289,6 +291,7 @@ function AddRouteModal({ onClose, onAdded }) {
 }
 
 function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
+  useScrollLock();
   const signedIn = user != null;
   const [progress, setProgress] = useState(null);
   const [stage, setStage] = useState("");

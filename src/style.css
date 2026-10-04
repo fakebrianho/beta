@@ -342,6 +342,8 @@ select {
 	justify-content: center;
 	padding: 20px;
 	z-index: 10;
+	overflow-y: auto;
+	overscroll-behavior: contain;
 }
 .modal {
 	position: relative;
@@ -351,7 +353,10 @@ select {
 	width: 100%;
 	max-width: 420px;
 	max-height: 90vh;
+	max-height: 90dvh; /* mobile browser chrome shrinks the real viewport */
 	overflow-y: auto;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
 }
 .modal form {
 	display: flex;
@@ -398,6 +403,7 @@ select {
 	}
 	.modal.route-detail {
 		max-height: 96vh;
+		max-height: 96dvh;
 	}
 	.desktop-only {
 		display: none;
