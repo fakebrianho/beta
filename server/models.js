@@ -62,7 +62,7 @@ const routeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// A send: proof video of someone doing a gallery route
+// A send: someone doing a gallery route, optionally with a proof video
 const sendSchema = new mongoose.Schema(
   {
     route: { type: mongoose.Schema.Types.ObjectId, ref: "Route", required: true, index: true },
@@ -73,7 +73,7 @@ const sendSchema = new mongoose.Schema(
     fa: { type: Boolean, default: false }, // claimed the route's first ascent
     bounty: { type: Boolean, default: false }, // ...and beat the setter to it
     points: { type: Number, default: 0 }, // legacy snapshot; scores are computed live
-    videoUrl: { type: String, required: true },
+    videoUrl: { type: String, default: null },
     posterUrl: { type: String, default: null }, // thumbnail so browsing costs no video bytes
   },
   { timestamps: true }

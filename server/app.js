@@ -682,13 +682,12 @@ app.patch("/api/users/:id/points", requireAuth, async (req, res) => {
   res.json(await leaderboardRows());
 });
 
-// Submit a send: a typed name + video, not tied to an account.
+// Submit a send: a typed name + optional video, not tied to an account.
 // The first send claims the FA and flips the bounty.
 app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
   const { videoUrl, posterUrl, author, passcode, grade, attempts } = req.body;
-  if (!videoUrl) return res.status(400).json({ error: "A send video is required" });
   const user = await userFromReq(req);
   const name = user?.name || author?.trim(); // signed-in sends use the account name
   if (!name) return res.status(400).json({ error: "Add your name" });
@@ -730,8 +729,8 @@ app.post("/api/routes/:id/sends", async (req, res) => {
           fa: claimedFa,
         })
       : 0,
-    videoUrl,
-    posterUrl: posterUrl || null,
+    videoUrl: videoUrl || null,
+    posterUrl: (videoUrl && posterUrl) || null,
   });
   let changed = false;
   if (claimedFa) {
@@ -740,8 +739,8 @@ app.post("/api/routes/:id/sends", async (req, res) => {
     changed = true;
   }
   // The route's beta is whichever video landed first — a setter upload always
-  // wins, otherwise the FA's send fills the slot.
-  if (!route.betaVideoUrl) {
+  // wins, otherwise the first send with a video fills the slot.
+  if (!route.betaVideoUrl && send.videoUrl) {
     route.betaVideoUrl = send.videoUrl;
     route.betaPosterUrl = send.posterUrl;
     route.betaBy = send.author;

@@ -7,7 +7,7 @@ const FAQS = [
 	},
 	{
 		q: "What's a bounty?",
-		a: "A route marked 💰 Bounty hasn't been climbed by anyone yet. Be the first to send it and submit a video as proof — you claim the FA (first ascent) and your name goes on the route. It's all for bragging rights.",
+		a: "A route marked 💰 Bounty hasn't been climbed by anyone yet. Be the first to send it and log it — you claim the FA (first ascent) and your name goes on the route. It's all for bragging rights.",
 	},
 	{
 		q: 'How does the leaderboard work?',
@@ -15,7 +15,7 @@ const FAQS = [
 	},
 	{
 		q: 'How do I submit a send?',
-		a: "Open a route in the gallery, scroll to the send form, enter your name, optionally your grade opinion, and upload a video of you doing the problem start to finish. If you're not signed in you'll also need the gym passcode. ask me or anyone else already using the app.",
+		a: "Open a route in the gallery, scroll to the send form, enter your name, how many attempts it took, and optionally your grade opinion and a video of you doing the problem start to finish. If you're not signed in you'll also need the gym passcode. ask me or anyone else already using the app.",
 	},
 	{
 		q: "What's the gym passcode for?",
