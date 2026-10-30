@@ -3,11 +3,13 @@ import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
 import { TAGS, TAG_COLORS } from "./tags.js";
 import { compressVideo, posterFrom, MAX_UPLOAD_MB, tooBig } from "./video.js";
+import WallEditor from "./WallEditor.jsx";
 
 export default function Dashboard({ role, onOpen }) {
   const [videos, setVideos] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [tagEditor, setTagEditor] = useState(null); // route id with tag editor open
+  const [editingWall, setEditingWall] = useState(false);
   const [progress, setProgress] = useState(null);
   const [stage, setStage] = useState("");
   const [error, setError] = useState("");
@@ -202,6 +204,17 @@ export default function Dashboard({ role, onOpen }) {
           ))}
         </div>
       </section>
+
+      {role === "coach" && (
+        <section className="wall-admin">
+          <h2>Wall hold map</h2>
+          {editingWall ? (
+            <WallEditor onClose={() => setEditingWall(false)} />
+          ) : (
+            <button onClick={() => setEditingWall(true)}>✎ Edit hold map</button>
+          )}
+        </section>
+      )}
 
       {role === "coach" && routes.length > 0 && (
         <section className="route-admin">

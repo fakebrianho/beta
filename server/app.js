@@ -12,7 +12,7 @@ import jwt from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import { handleUploadPresigned } from "@vercel/blob/client";
 import { del, issueSignedToken } from "@vercel/blob";
-import { User, Video, Comment, Route, Send } from "./models.js";
+import { User, Video, Comment, Route, Send, Wall } from "./models.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -443,9 +443,7 @@ app.get("/api/routes/:id", async (req, res) => {
     favorited: !!viewer?.favorites.some((f) => f.equals(route._id)),
     sends: sends.map((s) => ({
       ...s.toJSON(),
-      points: s.user
-        ? scoreSend({ grade: gv, attempts: s.attempts, fa: s.fa })
-        : 0,
+      points: scoreSend({ grade: gv, attempts: s.attempts, fa: s.fa }),
     })),
   });
 });
@@ -509,6 +507,41 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Wall (hold map) ----
+// There's a single wall; null until a coach uploads its photo
+app.get("/api/wall", async (req, res) => {
+  res.json(await Wall.findOne());
+});
+
+// Clamp to the image and round so a few hundred holds stay a small document
+const toPoint = (p) =>
+  Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)
+    ? p.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 1e4) / 1e4)
+    : null;
+
+app.put("/api/wall", requireAuth, async (req, res) => {
+  if (req.user.role !== "coach")
+    return res.status(403).json({ error: "Only coaches can edit the wall" });
+  const { imageUrl, holds } = req.body;
+  if (!imageUrl) return res.status(400).json({ error: "Need a wall photo" });
+  if (!Array.isArray(holds))
+    return res.status(400).json({ error: "Holds must be a list" });
+  const clean = [];
+  for (const h of holds) {
+    const points = (h?.points || []).map(toPoint);
+    if (typeof h?.id !== "string" || points.length < 3 || points.includes(null))
+      return res.status(400).json({ error: "Each hold needs an id and 3+ points" });
+    clean.push({ id: h.id, points });
+  }
+  const wall = (await Wall.findOne()) || new Wall();
+  if (wall.imageUrl && wall.imageUrl !== imageUrl && wall.imageUrl.startsWith("https://"))
+    await del(wall.imageUrl).catch(() => {});
+  wall.imageUrl = imageUrl;
+  wall.holds = clean;
+  await wall.save();
+  res.json(wall);
+});
+
 // Leaderboard scoring, off the route's effective grade:
 //   base      = grade × 1000 (V0 floors at 1000)
 //   flash     = base + 1000 bonus, with no attempt penalty (no bonus at V0)
@@ -531,13 +564,26 @@ function gradeValue(route) {
   return m ? Number(m[1]) : 0;
 }
 
-// Points only accrue to signed-up accounts (anonymous sends score 0).
-// Coaches never appear on the board.
+// Signed-in sends land on the account; passcode sends land under the typed
+// name. Coaches never appear on the board.
+function emptyRow({ id, name, avatarUrl, adjustment = 0, guest = false }) {
+  return {
+    id,
+    name,
+    avatarUrl,
+    earned: 0,
+    adjustment,
+    sends: 0,
+    fas: 0,
+    guest,
+  };
+}
+
 async function leaderboardRows() {
   const [users, routes, sends] = await Promise.all([
     User.find({ role: { $ne: "coach" } }),
     Route.find(),
-    Send.find({ user: { $ne: null } }),
+    Send.find(),
   ]);
 
   const gradeByRoute = {};
@@ -546,20 +592,17 @@ async function leaderboardRows() {
   const byUser = new Map(
     users.map((u) => [
       u.id,
-      {
+      emptyRow({
         id: u.id,
         name: u.name,
         avatarUrl: u.avatarUrl,
-        earned: 0,
         adjustment: u.pointsAdjustment || 0,
-        sends: 0,
-        fas: 0,
-      },
+      }),
     ])
   );
-  for (const s of sends) {
-    const row = byUser.get(s.user.toString());
-    if (!row) continue; // coach, or a deleted account
+  const byGuest = new Map(); // lowercase author → row
+
+  const credit = (row, s) => {
     row.earned += scoreSend({
       grade: gradeByRoute[s.route.toString()],
       attempts: s.attempts,
@@ -567,9 +610,27 @@ async function leaderboardRows() {
     });
     row.sends++;
     if (s.fa) row.fas++;
+  };
+
+  for (const s of sends) {
+    if (s.user) {
+      const row = byUser.get(s.user.toString());
+      if (!row) continue; // coach, or a deleted account
+      credit(row, s);
+      continue;
+    }
+    const name = s.author.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    let row = byGuest.get(key);
+    if (!row) {
+      row = emptyRow({ id: `guest:${key}`, name, guest: true });
+      byGuest.set(key, row);
+    }
+    credit(row, s);
   }
 
-  return [...byUser.values()]
+  return [...byUser.values(), ...byGuest.values()]
     .map((r) => ({ ...r, points: r.earned + r.adjustment }))
     .filter((r) => r.sends > 0 || r.adjustment !== 0)
     .sort((a, b) => b.points - a.points || a.sends - b.sends)
@@ -722,13 +783,11 @@ app.post("/api/routes/:id/sends", async (req, res) => {
     attempts: tries,
     fa: claimedFa,
     bounty: claimedBounty,
-    points: user
-      ? scoreSend({
-          grade: gradeValue(route),
-          attempts: tries,
-          fa: claimedFa,
-        })
-      : 0,
+    points: scoreSend({
+      grade: gradeValue(route),
+      attempts: tries,
+      fa: claimedFa,
+    }),
     videoUrl: videoUrl || null,
     posterUrl: (videoUrl && posterUrl) || null,
   });

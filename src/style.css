@@ -572,6 +572,90 @@ select {
 	filter: brightness(1.15);
 }
 
+/* wall hold map editor */
+.wall-admin {
+	margin-top: 28px;
+}
+.wall-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+.wall-toolbar-end {
+	display: flex;
+	gap: 8px;
+	margin-left: auto;
+}
+.wall-toolbar button:disabled {
+	opacity: 0.5;
+	cursor: default;
+	filter: none;
+}
+.wall-toolbar .danger {
+	color: var(--danger);
+}
+.wall-scroll {
+	overflow: auto;
+	max-height: 80vh;
+	border-radius: 10px;
+	background: var(--panel);
+}
+.wall-canvas {
+	position: relative;
+	user-select: none;
+}
+.wall-canvas img {
+	display: block;
+	width: 100%;
+}
+.wall-canvas svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	cursor: crosshair;
+	touch-action: manipulation; /* no double-tap zoom while tracing */
+}
+/* Outlines stay the same pixel width at any zoom or screen size */
+.wall-canvas svg * {
+	vector-effect: non-scaling-stroke;
+	stroke-linejoin: round;
+}
+.hold-shape {
+	fill: rgba(255, 255, 255, 0.12);
+	stroke: #fff;
+	stroke-width: 2px;
+	cursor: pointer;
+}
+.hold-shape.selected {
+	fill: rgba(79, 140, 255, 0.3);
+	stroke: var(--accent);
+	stroke-width: 3px;
+}
+.hold-draft {
+	fill: none;
+	stroke: var(--accent);
+	stroke-width: 2px;
+	stroke-dasharray: 6 4;
+}
+.hold-vertex {
+	position: absolute;
+	width: 8px;
+	height: 8px;
+	margin: -4px 0 0 -4px;
+	border-radius: 50%;
+	background: var(--accent);
+	border: 1px solid #fff;
+	pointer-events: none;
+}
+.hold-vertex.closer {
+	width: 14px;
+	height: 14px;
+	margin: -7px 0 0 -7px;
+	background: #fff;
+}
+
 /* grade filter */
 .grade-filter {
 	display: flex;

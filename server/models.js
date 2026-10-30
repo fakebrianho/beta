@@ -79,6 +79,19 @@ const sendSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// The spray wall: one shared photo, with every hold traced once as a polygon
+// in 0..1 image coordinates so routes can reference holds by id
+const wallSchema = new mongoose.Schema(
+  {
+    imageUrl: { type: String, required: true },
+    holds: {
+      type: [{ _id: false, id: String, points: [[Number]] }],
+      default: [],
+    },
+  },
+  { timestamps: true }
+);
+
 // Serve the same shape the client already expects (id, url, createdAt)
 const clean = (schema) =>
   schema.set("toJSON", {
@@ -99,9 +112,11 @@ clean(videoSchema);
 clean(commentSchema);
 clean(routeSchema);
 clean(sendSchema);
+clean(wallSchema);
 
 export const User = mongoose.model("User", userSchema);
 export const Video = mongoose.model("Video", videoSchema);
 export const Comment = mongoose.model("Comment", commentSchema);
 export const Route = mongoose.model("Route", routeSchema);
 export const Send = mongoose.model("Send", sendSchema);
+export const Wall = mongoose.model("Wall", wallSchema);

@@ -45,6 +45,13 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(json),
+  getWall: () => fetch("/api/wall").then(json),
+  saveWall: (data) =>
+    fetch("/api/wall", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json),
   checkPasscode: (passcode) => post("/api/check-passcode", { passcode }),
   addSend: (routeId, data) => post(`/api/routes/${routeId}/sends`, data),
   leaderboard: () => fetch("/api/leaderboard").then(json),
