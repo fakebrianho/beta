@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
-import { toDisplayableImage } from "./image.js";
 import LazyVideo from "./LazyVideo.jsx";
 import useScrollLock from "./useScrollLock.js";
 import { compressVideo, posterFrom, MAX_UPLOAD_MB, tooBig } from "./video.js";
@@ -325,103 +324,73 @@ function WallSetter({ wall, holds, onChange }) {
   );
 }
 
+// New routes are set on the shared wall and stored as hold data only, so
+// adding one never uploads an image
 function AddRouteModal({ wall, onClose, onAdded }) {
   useScrollLock();
   const formRef = useRef(null);
-  const [progress, setProgress] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const canSet = wall?.holds?.length > 0;
-  const [chosenMode, setMode] = useState(null);
-  const mode = chosenMode || (canSet ? "wall" : "photo");
   const [holds, setHolds] = useState({}); // { holdId: role }
+  const canSet = wall?.holds?.length > 0;
+  const problem = holdProblem(holds);
 
   async function submit(e) {
     e.preventDefault();
+    if (problem) return setError(problem);
     setError("");
     const fd = new FormData(formRef.current);
-    const route = {
-      title: fd.get("title"),
-      grade: fd.get("grade"),
-      match: fd.get("match") === "on",
-      notes: fd.get("notes"),
-    };
+    setSaving(true);
     try {
-      if (mode === "wall") {
-        const problem = holdProblem(holds);
-        if (problem) return setError(problem);
-        route.holds = Object.entries(holds).map(([hold, role]) => ({ hold, role }));
-      } else {
-        const image = fd.get("image");
-        if (!image?.name) return setError("Pick a hero image first.");
-        setProgress(0);
-        route.imageUrl = await api.uploadFile(
-          await toDisplayableImage(image),
-          setProgress
-        );
-      }
-      await api.addRoute(route);
+      await api.addRoute({
+        title: fd.get("title"),
+        grade: fd.get("grade"),
+        match: fd.get("match") === "on",
+        notes: fd.get("notes"),
+        holds: Object.entries(holds).map(([hold, role]) => ({ hold, role })),
+      });
       onAdded();
     } catch (err) {
       setError(err.message);
     } finally {
-      setProgress(null);
+      setSaving(false);
     }
   }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className={`modal ${mode === "wall" ? "wide" : ""}`}
+        className={`modal ${canSet ? "wide" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button className="modal-close" onClick={onClose} aria-label="Close">
           ✕
         </button>
         <h3>Add a route</h3>
-        {canSet && (
-          <div className="role-toggle add-route-mode">
-            <button
-              type="button"
-              className={mode === "wall" ? "active" : ""}
-              onClick={() => setMode("wall")}
-            >
-              Set on the wall
-            </button>
-            <button
-              type="button"
-              className={mode === "photo" ? "active" : ""}
-              onClick={() => setMode("photo")}
-            >
-              Upload a photo
-            </button>
-          </div>
-        )}
-        <form ref={formRef} onSubmit={submit}>
-          <input name="title" placeholder="Route name" required />
-          <input name="grade" placeholder="Proposed grade (e.g. V6)" />
-          <label className="check-label">
-            <input name="match" type="checkbox" defaultChecked />
-            Matching allowed
-          </label>
-          <textarea name="notes" rows={2} placeholder="Beta / description (optional)" />
-          {mode === "wall" ? (
-            <WallSetter wall={wall} holds={holds} onChange={setHolds} />
-          ) : (
-            <label className="muted">
-              Hero image (vertical works best)
-              <input name="image" type="file" accept="image/*" required />
+        {!canSet ? (
+          <p className="muted">
+            Routes are set on the wall photo. Trace the wall's holds first, from
+            Dashboard → Wall hold map.
+          </p>
+        ) : (
+          <form ref={formRef} onSubmit={submit}>
+            <input name="title" placeholder="Route name" required />
+            <input name="grade" placeholder="Proposed grade (e.g. V6)" />
+            <label className="check-label">
+              <input name="match" type="checkbox" defaultChecked />
+              Matching allowed
             </label>
-          )}
-          <button
-            type="submit"
-            disabled={progress !== null || (mode === "wall" && !!holdProblem(holds))}
-            title={mode === "wall" ? holdProblem(holds) || undefined : undefined}
-          >
-            {progress !== null
-              ? `Uploading… ${Math.round(progress * 100)}%`
-              : "Add to gallery"}
-          </button>
-        </form>
+            <textarea name="notes" rows={2} placeholder="Beta / description (optional)" />
+            <WallSetter wall={wall} holds={holds} onChange={setHolds} />
+            <button
+              type="submit"
+              disabled={saving || !!problem}
+              title={problem || undefined}
+            >
+              {saving ? "Saving…" : "Add to gallery"}
+            </button>
+          </form>
+        )}
         {error && <p className="error">{error}</p>}
       </div>
     </div>
@@ -443,15 +412,12 @@ function RouteDetail({ route, wall, user, onToggleFavorite, onClose, onChanged }
     const fd = new FormData(formRef.current);
     const file = fd.get("video");
     const author = user?.name || (fd.get("author") || "").trim();
-    const passcode = (fd.get("passcode") || "").trim();
     const attempts = fd.get("attempts");
     if (!author) return setError("Add your name.");
     if (!attempts || Number(attempts) < 1)
       return setError("How many attempts did it take?");
     setError("");
     try {
-      await api.checkPasscode(passcode); // fail fast before the big upload
-
       let videoUrl = null;
       let posterUrl = null;
       if (file?.name) {
@@ -466,9 +432,9 @@ function RouteDetail({ route, wall, user, onToggleFavorite, onClose, onChanged }
 
         setStage("Uploading…");
         setProgress(0);
-        videoUrl = await api.uploadFile(clip, setProgress, passcode);
+        videoUrl = await api.uploadFile(clip, setProgress);
         posterUrl = poster
-          ? await api.uploadFile(poster, null, passcode).catch(() => null)
+          ? await api.uploadFile(poster).catch(() => null)
           : null;
       }
 
@@ -478,7 +444,6 @@ function RouteDetail({ route, wall, user, onToggleFavorite, onClose, onChanged }
         videoUrl,
         posterUrl,
         author,
-        passcode,
         grade: sendGrade,
         attempts: Number(attempts),
       });
@@ -647,14 +612,6 @@ function RouteDetail({ route, wall, user, onToggleFavorite, onClose, onChanged }
                   ))}
                 </div>
               </div>
-              {!signedIn && (
-                <input
-                  name="passcode"
-                  placeholder="Gym passcode"
-                  autoComplete="off"
-                  required
-                />
-              )}
               <label className="muted">
                 Got a video? Add it (optional) — keep it under 30 seconds, it
                 gets shrunk before uploading:

@@ -31,12 +31,6 @@ const roleFor = (email) =>
 // a compressed 30s send clip lands around 5MB.
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
-// Simple shared passcode gating anonymous gallery sends (and their uploads)
-const SEND_PASSCODE = process.env.SEND_PASSCODE || "sendit";
-const passcodeOk = (p) =>
-  typeof p === "string" &&
-  p.trim().toLowerCase() === SEND_PASSCODE.toLowerCase();
-
 // Cached connection so serverless invocations reuse it
 let dbPromise = null;
 export function ensureDb() {
@@ -70,7 +64,7 @@ function setSession(res, user) {
   });
 }
 
-// Session user if present, else null (for routes open to passcode holders)
+// Session user if present, else null (for routes open to anonymous senders)
 async function userFromReq(req) {
   try {
     const { id } = jwt.verify(req.cookies[COOKIE], JWT_SECRET);
@@ -250,29 +244,14 @@ app.get("/api/auth/magic", async (req, res) => {
 // serverless body limit). Presigned flow: works with OIDC auth (BLOB_STORE_ID
 // + VERCEL_OIDC_TOKEN), no static read-write token needed. The client gets a
 // presigned PUT URL here, uploads to Blob, then registers the video via
-// Cheap pre-check so the send form can reject a bad passcode with a clear
-// message before spending time uploading the video
-app.post("/api/check-passcode", async (req, res) => {
-  if ((await userFromReq(req)) || passcodeOk(req.body.passcode))
-    return res.json({ ok: true });
-  res.status(401).json({ error: "Wrong passcode — ask at the gym" });
-});
-
-// POST /api/videos with the blob URL. Allowed for signed-in users, or for
-// anonymous gallery senders who supply the shared passcode (clientPayload).
+// POST /api/videos with the blob URL. Open to anonymous gallery senders too,
+// capped at MAX_UPLOAD_BYTES per file.
 app.post("/api/blob/upload", async (req, res) => {
   try {
     const jsonResponse = await handleUploadPresigned({
       body: req.body,
       request: req,
-      getSignedToken: async (pathname, clientPayload) => {
-        if (!(await userFromReq(req))) {
-          let passcode;
-          try {
-            passcode = JSON.parse(clientPayload || "{}").passcode;
-          } catch {}
-          if (!passcodeOk(passcode)) throw new Error("Wrong passcode");
-        }
+      getSignedToken: async (pathname) => {
         return {
           token: await issueSignedToken({
             pathname,
@@ -427,23 +406,20 @@ function cleanHolds(holds) {
 app.post("/api/routes", requireAuth, async (req, res) => {
   if (req.user.role !== "coach")
     return res.status(403).json({ error: "Only coaches can add routes" });
-  const { title, grade, imageUrl, notes, match } = req.body;
+  // New routes are hold data on the shared wall — no per-route image upload
+  const { title, grade, notes, match } = req.body;
   const holds = cleanHolds(req.body.holds);
-  if (!title || (!imageUrl && !holds.length))
-    return res.status(400).json({ error: "Need a title and an image or holds" });
-  if (holds.length) {
-    const count = (r) => holds.filter((h) => h.role === r).length;
-    if (count("start") < 1 || count("start") > 2 || count("finish") < 1 || count("finish") > 2)
-      return res
-        .status(400)
-        .json({ error: "A route needs 1–2 start holds and 1–2 finish holds" });
-  }
+  if (!title) return res.status(400).json({ error: "Need a title" });
+  const count = (r) => holds.filter((h) => h.role === r).length;
+  if (count("start") < 1 || count("start") > 2 || count("finish") < 1 || count("finish") > 2)
+    return res
+      .status(400)
+      .json({ error: "A route needs 1–2 start holds and 1–2 finish holds" });
   const route = await Route.create({
     owner: req.user.id,
     title,
     grade: grade || "?",
     match: !!match,
-    imageUrl: imageUrl || null,
     holds,
     notes: notes || "",
   });
@@ -593,7 +569,7 @@ function gradeValue(route) {
   return m ? Number(m[1]) : 0;
 }
 
-// Signed-in sends land on the account; passcode sends land under the typed
+// Signed-in sends land on the account; anonymous sends land under the typed
 // name. Coaches never appear on the board.
 function emptyRow({ id, name, avatarUrl, adjustment = 0, guest = false }) {
   return {
@@ -778,12 +754,10 @@ app.patch("/api/users/:id/points", requireAuth, async (req, res) => {
 app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
-  const { videoUrl, posterUrl, author, passcode, grade, attempts } = req.body;
+  const { videoUrl, posterUrl, author, grade, attempts } = req.body;
   const user = await userFromReq(req);
   const name = user?.name || author?.trim(); // signed-in sends use the account name
   if (!name) return res.status(400).json({ error: "Add your name" });
-  if (!user && !passcodeOk(passcode))
-    return res.status(401).json({ error: "Wrong passcode — ask at the gym" });
   const tries = Math.floor(Number(attempts));
   if (!Number.isFinite(tries) || tries < 1)
     return res.status(400).json({ error: "How many attempts did it take?" });

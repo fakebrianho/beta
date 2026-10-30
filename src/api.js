@@ -20,12 +20,11 @@ export const api = {
   listVideos: () => fetch("/api/videos").then(json),
   getVideo: (id) => fetch(`/api/videos/${id}`).then(json),
   // Browser → Vercel Blob directly (presigned PUT minted by /api/blob/upload)
-  uploadFile: async (file, onProgress, passcode) => {
+  uploadFile: async (file, onProgress) => {
     const { uploadPresigned } = await import("@vercel/blob/client");
     const blob = await uploadPresigned(file.name, file, {
       access: "public",
       handleUploadUrl: "/api/blob/upload",
-      clientPayload: passcode ? JSON.stringify({ passcode }) : undefined,
       onUploadProgress: ({ percentage }) => onProgress?.(percentage / 100),
     });
     return blob.url;
@@ -52,7 +51,6 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(json),
-  checkPasscode: (passcode) => post("/api/check-passcode", { passcode }),
   addSend: (routeId, data) => post(`/api/routes/${routeId}/sends`, data),
   leaderboard: () => fetch("/api/leaderboard").then(json),
   toggleFavorite: (routeId) => post(`/api/routes/${routeId}/favorite`, {}),

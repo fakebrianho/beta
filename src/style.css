@@ -661,17 +661,17 @@ select {
 }
 .wall-hold-role polygon {
 	fill: transparent;
-	stroke-width: 4px;
+	stroke-width: 3px;
 }
 .wall-hold-role .wall-hold-halo {
 	stroke: rgba(0, 0, 0, 0.6);
-	stroke-width: 7px;
+	stroke-width: 6px;
 }
 .route-thumb .wall-hold-role polygon {
-	stroke-width: 3px;
+	stroke-width: 2px;
 }
 .route-thumb .wall-hold-role .wall-hold-halo {
-	stroke-width: 5px;
+	stroke-width: 4px;
 }
 .route-card .wall-view {
 	display: block;

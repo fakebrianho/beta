@@ -264,18 +264,21 @@ export default function Dashboard({ role, onOpen }) {
                 >
                   {r.match ? "🚫 no match" : "🤝 match"}
                 </button>
-                <label className="photo-btn" title="Replace the hero photo">
-                  📷
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={(e) => {
-                      changePhoto(r, e.target.files?.[0]);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                {!r.holds?.length && (
+                  // Legacy photo routes only; wall routes have no photo
+                  <label className="photo-btn" title="Replace the hero photo">
+                    📷
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        changePhoto(r, e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
                 <label
                   className="photo-btn"
                   title={
