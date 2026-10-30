@@ -33,7 +33,7 @@ export default function Leaderboard({ role, onOpenProfile }) {
       <p className="muted">
         Base = grade × 1000 (V0 counts as 1000). Flash adds a 1000 bonus with no
         attempt penalty; otherwise it's base − 100 × attempts. An FA adds 1000.
-        Sign up and log your sends to get on the board.
+        Log a send with your name to get on the board.
       </p>
       {error && <p className="error">{error}</p>}
       {rows && rows.length === 0 && (
@@ -53,8 +53,8 @@ export default function Leaderboard({ role, onOpenProfile }) {
             <div key={r.id} className={`lb-row ${r.rank <= 3 ? "top" : ""}`}>
               <span>{MEDALS[r.rank - 1] || r.rank}</span>
               <span
-                className={`lb-name ${onOpenProfile ? "clickable" : ""}`}
-                onClick={() => onOpenProfile?.(r.id)}
+                className={`lb-name ${onOpenProfile && !r.guest ? "clickable" : ""}`}
+                onClick={() => !r.guest && onOpenProfile?.(r.id)}
               >
                 <Avatar name={r.name} url={r.avatarUrl} size={26} />
                 {r.name}
@@ -73,15 +73,18 @@ export default function Leaderboard({ role, onOpenProfile }) {
               </span>
               <span>{r.sends}</span>
               <span>{r.fas || "—"}</span>
-              {isCoach && (
-                <button
-                  className="lb-edit"
-                  title="Edit this score"
-                  onClick={() => editScore(r)}
-                >
-                  ✎
-                </button>
-              )}
+              {isCoach &&
+                (r.guest ? (
+                  <span />
+                ) : (
+                  <button
+                    className="lb-edit"
+                    title="Edit this score"
+                    onClick={() => editScore(r)}
+                  >
+                    ✎
+                  </button>
+                ))}
             </div>
           ))}
         </div>

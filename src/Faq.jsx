@@ -11,7 +11,7 @@ const FAQS = [
 	},
 	{
 		q: 'How does the leaderboard work?',
-		a: "If you're signed up, points scale with the grade and how many attempts it took. Base is grade * 1000 (V0 counts as 1000). A flash adds a 1000 bonus and takes no attempt penalty, so a V5 flash is 5000 + 1000 = 6000. Anything else is base - (100 * attempts), so a 4th go on a V5 is 5000 - 400 = 4600. An FA adds another 1000 on top. V0s don't get the flash bonus. If a route gets regraded, everyone's points for it move with it.",
+		a: "Points scale with the grade and how many attempts it took, whether you posted signed in or just left a name. Base is grade * 1000 (V0 counts as 1000). A flash adds a 1000 bonus and takes no attempt penalty, so a V5 flash is 5000 + 1000 = 6000. Anything else is base - (100 * attempts), so a 4th go on a V5 is 5000 - 400 = 4600. An FA adds another 1000 on top. V0s don't get the flash bonus. If a route gets regraded, everyone's points for it move with it. Signed-in sends also show on your profile.",
 	},
 	{
 		q: 'How do I submit a send?',
@@ -27,7 +27,7 @@ const FAQS = [
 	},
 	{
 		q: 'Do I need an account?',
-		a: 'Not for browsing the gallery or submitting sends. You need an account for video coaching and to participate in the spray wall leaderboards.',
+		a: "Not for browsing the gallery or logging sends — a name and the gym passcode is enough to show up on the leaderboard. You need an account for video coaching, and signed-in sends attach to your profile.",
 	},
 	{
 		q: 'How do I sign in without a password?',
