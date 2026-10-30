@@ -412,18 +412,39 @@ app.post("/api/routes/:id/favorite", requireAuth, async (req, res) => {
   res.json({ favorited: i < 0 });
 });
 
+const HOLD_ROLES = ["start", "hand", "foot", "finish"];
+
+// One role per hold; anything malformed is dropped
+function cleanHolds(holds) {
+  if (!Array.isArray(holds)) return [];
+  const byHold = new Map();
+  for (const h of holds)
+    if (typeof h?.hold === "string" && HOLD_ROLES.includes(h.role))
+      byHold.set(h.hold, h.role);
+  return [...byHold].map(([hold, role]) => ({ hold, role }));
+}
+
 app.post("/api/routes", requireAuth, async (req, res) => {
   if (req.user.role !== "coach")
     return res.status(403).json({ error: "Only coaches can add routes" });
   const { title, grade, imageUrl, notes, match } = req.body;
-  if (!title || !imageUrl)
-    return res.status(400).json({ error: "Need a title and an image" });
+  const holds = cleanHolds(req.body.holds);
+  if (!title || (!imageUrl && !holds.length))
+    return res.status(400).json({ error: "Need a title and an image or holds" });
+  if (holds.length) {
+    const count = (r) => holds.filter((h) => h.role === r).length;
+    if (count("start") < 1 || count("start") > 2 || count("finish") < 1 || count("finish") > 2)
+      return res
+        .status(400)
+        .json({ error: "A route needs 1–2 start holds and 1–2 finish holds" });
+  }
   const route = await Route.create({
     owner: req.user.id,
     title,
     grade: grade || "?",
     match: !!match,
-    imageUrl,
+    imageUrl: imageUrl || null,
+    holds,
     notes: notes || "",
   });
   res.status(201).json(route);
@@ -488,12 +509,20 @@ app.patch("/api/routes/:id", requireAuth, async (req, res) => {
   });
 });
 
+// Coaches (admins) can delete any route. Its owner can delete it only until
+// someone has sent it — after that it's part of people's records.
 app.delete("/api/routes/:id", requireAuth, async (req, res) => {
-  if (req.user.role !== "coach")
-    return res.status(403).json({ error: "Only coaches can delete routes" });
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
   const sends = await Send.find({ route: route.id });
+  if (req.user.role !== "coach") {
+    if (!route.owner.equals(req.user.id))
+      return res.status(403).json({ error: "Only the route's setter can delete it" });
+    if (sends.length)
+      return res
+        .status(403)
+        .json({ error: "This route has sends — only an admin can delete it now" });
+  }
   await Send.deleteMany({ route: route.id });
   await route.deleteOne();
   for (const u of [
@@ -656,6 +685,7 @@ async function buildProfile(user, isSelf) {
     id: r.id,
     title: r.title,
     imageUrl: r.imageUrl,
+    holds: r.holds,
     status: r.status,
     match: r.match,
     tags: r.tags,

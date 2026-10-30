@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
 import { TAG_COLORS } from "./tags.js";
+import { RouteImage, useWall } from "./WallView.jsx";
 
 export function Avatar({ name, url, size }) {
   const style = size ? { width: size, height: size, fontSize: size / 2.4 } : null;
@@ -15,9 +16,10 @@ export function Avatar({ name, url, size }) {
 }
 
 function RouteTile({ route, onOpen }) {
+  const wall = useWall();
   return (
     <div className="mini-route" onClick={() => onOpen?.(route.id)}>
-      <img src={route.imageUrl} alt="" loading="lazy" />
+      <RouteImage route={route} wall={wall} className="route-thumb" lazy />
       <div className="mini-route-body">
         <strong>{route.title}</strong>
         <div className="badges">

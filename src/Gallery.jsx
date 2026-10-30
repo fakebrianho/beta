@@ -5,6 +5,15 @@ import LazyVideo from "./LazyVideo.jsx";
 import useScrollLock from "./useScrollLock.js";
 import { compressVideo, posterFrom, MAX_UPLOAD_MB, tooBig } from "./video.js";
 import { TAGS, TAG_COLORS } from "./tags.js";
+import WallView, {
+  ROLES,
+  ROLE_COLORS,
+  RoleLegend,
+  RouteImage,
+  holdMap,
+  holdProblem,
+  useWall,
+} from "./WallView.jsx";
 
 // "V6", "v5/6", "6" → 6; unparseable grades return null
 const gradeNum = (r) => {
@@ -64,6 +73,7 @@ export default function Gallery({
   const [error, setError] = useState("");
   const [gradeRange, setGradeRange] = useState([0, 17]);
   const [tagFilter, setTagFilter] = useState([]);
+  const wall = useWall();
 
   const [lo, hi] = gradeRange;
   const setLo = (v) => setGradeRange([Math.min(v, hi), hi]);
@@ -173,7 +183,7 @@ export default function Gallery({
       <div className="route-grid">
         {filtered.map((r) => (
           <div key={r.id} className="route-card" onClick={() => open(r.id)}>
-            <img src={r.imageUrl} alt={r.title} loading="lazy" />
+            <RouteImage route={r} wall={wall} lazy />
             {user && (
               <button
                 className={`fav-btn ${r.favorited ? "on" : ""}`}
@@ -205,6 +215,7 @@ export default function Gallery({
 
       {adding && (
         <AddRouteModal
+          wall={wall}
           onClose={() => setAdding(false)}
           onAdded={() => {
             setAdding(false);
@@ -216,6 +227,7 @@ export default function Gallery({
       {openRoute && (
         <RouteDetail
           route={openRoute}
+          wall={wall}
           user={user}
           onToggleFavorite={() => toggleFavorite(openRoute.id)}
           onClose={() => setOpenRoute(null)}
@@ -229,31 +241,125 @@ export default function Gallery({
   );
 }
 
-function AddRouteModal({ onClose, onAdded }) {
+// Tap a hold on the wall, then pick what it's for
+function WallSetter({ wall, holds, onChange }) {
+  const [picking, setPicking] = useState(null); // { id, x, y } in % of the wall
+  const [zoom, setZoom] = useState(1);
+
+  function tapHold(h, e) {
+    e.stopPropagation();
+    const xs = h.points.map((p) => p[0]);
+    const ys = h.points.map((p) => p[1]);
+    setPicking({
+      id: h.id,
+      // Keep the picker from hanging off the sides of the wall
+      x: Math.min(82, Math.max(18, ((Math.min(...xs) + Math.max(...xs)) / 2) * 100)),
+      y: Math.max(...ys) * 100, // just under the hold
+      above: Math.max(...ys) > 0.8, // ...unless that runs off the bottom
+      top: Math.min(...ys) * 100,
+    });
+  }
+
+  function pick(role) {
+    const next = { ...holds };
+    if (role) next[picking.id] = role;
+    else delete next[picking.id];
+    onChange(next);
+    setPicking(null);
+  }
+
+  return (
+    <div className="wall-setter">
+      <div className="wall-setter-bar">
+        <RoleLegend holds={holds} />
+        <span className="wall-setter-zoom">
+          {[1, 2, 3].map((z) => (
+            <button
+              type="button"
+              key={z}
+              className={zoom === z ? "on" : ""}
+              onClick={() => setZoom(z)}
+            >
+              {z}×
+            </button>
+          ))}
+        </span>
+      </div>
+      <div className="wall-setter-scroll">
+        <div
+          className="wall-setter-canvas"
+          style={{ width: `${zoom * 100}%` }}
+          onClick={() => setPicking(null)}
+        >
+          <WallView wall={wall} holds={holds} showAll onTapHold={tapHold} />
+          {picking && (
+            <div
+              className={`hold-picker ${picking.above ? "above" : ""}`}
+              style={{
+                left: `${picking.x}%`,
+                top: `${picking.above ? picking.top : picking.y}%`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {ROLES.map((r) => (
+                <button
+                  type="button"
+                  key={r}
+                  className={holds[picking.id] === r ? "on" : ""}
+                  style={{ borderColor: ROLE_COLORS[r] }}
+                  onClick={() => pick(holds[picking.id] === r ? null : r)}
+                >
+                  {r}
+                </button>
+              ))}
+              {holds[picking.id] && (
+                <button type="button" onClick={() => pick(null)} title="Remove">
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddRouteModal({ wall, onClose, onAdded }) {
   useScrollLock();
   const formRef = useRef(null);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
+  const canSet = wall?.holds?.length > 0;
+  const [chosenMode, setMode] = useState(null);
+  const mode = chosenMode || (canSet ? "wall" : "photo");
+  const [holds, setHolds] = useState({}); // { holdId: role }
 
   async function submit(e) {
     e.preventDefault();
     setError("");
     const fd = new FormData(formRef.current);
-    const image = fd.get("image");
-    if (!image?.name) return setError("Pick a hero image first.");
+    const route = {
+      title: fd.get("title"),
+      grade: fd.get("grade"),
+      match: fd.get("match") === "on",
+      notes: fd.get("notes"),
+    };
     try {
-      setProgress(0);
-      const imageUrl = await api.uploadFile(
-        await toDisplayableImage(image),
-        setProgress
-      );
-      await api.addRoute({
-        title: fd.get("title"),
-        grade: fd.get("grade"),
-        match: fd.get("match") === "on",
-        notes: fd.get("notes"),
-        imageUrl,
-      });
+      if (mode === "wall") {
+        const problem = holdProblem(holds);
+        if (problem) return setError(problem);
+        route.holds = Object.entries(holds).map(([hold, role]) => ({ hold, role }));
+      } else {
+        const image = fd.get("image");
+        if (!image?.name) return setError("Pick a hero image first.");
+        setProgress(0);
+        route.imageUrl = await api.uploadFile(
+          await toDisplayableImage(image),
+          setProgress
+        );
+      }
+      await api.addRoute(route);
       onAdded();
     } catch (err) {
       setError(err.message);
@@ -264,11 +370,32 @@ function AddRouteModal({ onClose, onAdded }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`modal ${mode === "wall" ? "wide" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <button className="modal-close" onClick={onClose} aria-label="Close">
           ✕
         </button>
         <h3>Add a route</h3>
+        {canSet && (
+          <div className="role-toggle add-route-mode">
+            <button
+              type="button"
+              className={mode === "wall" ? "active" : ""}
+              onClick={() => setMode("wall")}
+            >
+              Set on the wall
+            </button>
+            <button
+              type="button"
+              className={mode === "photo" ? "active" : ""}
+              onClick={() => setMode("photo")}
+            >
+              Upload a photo
+            </button>
+          </div>
+        )}
         <form ref={formRef} onSubmit={submit}>
           <input name="title" placeholder="Route name" required />
           <input name="grade" placeholder="Proposed grade (e.g. V6)" />
@@ -277,11 +404,19 @@ function AddRouteModal({ onClose, onAdded }) {
             Matching allowed
           </label>
           <textarea name="notes" rows={2} placeholder="Beta / description (optional)" />
-          <label className="muted">
-            Hero image (vertical works best)
-            <input name="image" type="file" accept="image/*" required />
-          </label>
-          <button type="submit" disabled={progress !== null}>
+          {mode === "wall" ? (
+            <WallSetter wall={wall} holds={holds} onChange={setHolds} />
+          ) : (
+            <label className="muted">
+              Hero image (vertical works best)
+              <input name="image" type="file" accept="image/*" required />
+            </label>
+          )}
+          <button
+            type="submit"
+            disabled={progress !== null || (mode === "wall" && !!holdProblem(holds))}
+            title={mode === "wall" ? holdProblem(holds) || undefined : undefined}
+          >
             {progress !== null
               ? `Uploading… ${Math.round(progress * 100)}%`
               : "Add to gallery"}
@@ -293,7 +428,7 @@ function AddRouteModal({ onClose, onAdded }) {
   );
 }
 
-function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
+function RouteDetail({ route, wall, user, onToggleFavorite, onClose, onChanged }) {
   useScrollLock();
   const signedIn = user != null;
   const [progress, setProgress] = useState(null);
@@ -367,7 +502,19 @@ function RouteDetail({ route, user, onToggleFavorite, onClose, onChanged }) {
           ✕
         </button>
         <div className="route-detail-layout">
-          <img className="route-hero" src={route.imageUrl} alt={route.title} />
+          {route.holds?.length ? (
+            <div>
+              <WallView
+                wall={wall}
+                holds={holdMap(route.holds)}
+                dim
+                className="route-hero"
+              />
+              <RoleLegend />
+            </div>
+          ) : (
+            <img className="route-hero" src={route.imageUrl} alt={route.title} />
+          )}
           <div className="route-info">
             <h3 className="route-title-row">
               <span>

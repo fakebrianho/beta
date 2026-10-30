@@ -1,25 +1,53 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
+import { forgetWall } from "./WallView.jsx";
 
-const CLOSE_PX = 12; // clicking this close to the first point closes the hold
+const MIN_STEP_PX = 2; // skip pointer samples closer than this to the last one
+const CLICK_PX = 6; // a stroke shorter than this is a click, not a drawing
+const SIMPLIFY_PX = 1.5; // how far the stored outline may stray from the stroke
 const ZOOMS = [1, 1.5, 2, 3, 4];
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 const toPoints = (pts) => pts.map((p) => p.join(",")).join(" ");
 
-// Coach tool for tracing every hold on the wall photo once. Holds are stored
-// as polygons in 0..1 image coordinates, so they line up at any screen size.
+// Ramer–Douglas–Peucker: keep only the points that carry the shape, so a
+// freehand stroke of hundreds of samples becomes a dozen or so
+function simplify(pts, tol) {
+  if (pts.length < 3) return pts;
+  const [ax, ay] = pts[0];
+  const [bx, by] = pts[pts.length - 1];
+  const len = Math.hypot(bx - ax, by - ay);
+  let far = 0;
+  let idx = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i];
+    const d = len
+      ? Math.abs((bx - ax) * (ay - py) - (ax - px) * (by - ay)) / len
+      : Math.hypot(px - ax, py - ay);
+    if (d > far) [far, idx] = [d, i];
+  }
+  if (far <= tol) return [pts[0], pts[pts.length - 1]];
+  return [
+    ...simplify(pts.slice(0, idx + 1), tol).slice(0, -1),
+    ...simplify(pts.slice(idx), tol),
+  ];
+}
+
+// Coach tool for tracing every hold on the wall photo once: draw around a
+// hold freehand and letting go closes it. Holds are stored as polygons in
+// 0..1 image coordinates, so they line up at any screen size.
 export default function WallEditor({ onClose }) {
   const [wall, setWall] = useState(undefined); // undefined = loading, null = no wall yet
   const [holds, setHolds] = useState([]);
-  const [draft, setDraft] = useState([]); // points of the hold being traced
+  const [draft, setDraft] = useState([]); // live stroke, for display only
   const [selected, setSelected] = useState(null);
   const [zoom, setZoom] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const svgRef = useRef(null);
+  const stroke = useRef(null); // { rect, hit, points, length } while drawing
 
   useEffect(() => {
     api
@@ -43,48 +71,60 @@ export default function WallEditor({ onClose }) {
     setDirty(true);
   };
 
-  function finishHold() {
-    if (draft.length < 3) return;
-    const id = newId();
-    editHolds([...holds, { id, points: draft }]);
-    setDraft([]);
-    setSelected(id);
-  }
-
   function deleteSelected() {
     if (!selected) return;
     editHolds(holds.filter((h) => h.id !== selected));
     setSelected(null);
   }
 
-  function handleClick(e) {
-    if (e.detail >= 2) return finishHold(); // second click of a double-click
+  function pointerDown(e) {
+    if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    // Not tracing: clicking a traced hold selects it
-    const hit = e.target.dataset?.id;
-    if (draft.length === 0 && hit) return setSelected(hit === selected ? null : hit);
-    if (draft.length >= 3) {
-      const [fx, fy] = draft[0];
-      if (Math.hypot(fx * rect.width - x, fy * rect.height - y) < CLOSE_PX)
-        return finishHold();
-    }
-    setSelected(null);
-    setDraft([...draft, [x / rect.width, y / rect.height]]);
+    const points = [[e.clientX - rect.left, e.clientY - rect.top]];
+    stroke.current = { rect, hit: e.target.dataset?.id, points, length: 0 };
+    setDraft(points);
+  }
+
+  function pointerMove(e) {
+    const s = stroke.current;
+    if (!s) return;
+    const p = [e.clientX - s.rect.left, e.clientY - s.rect.top];
+    const [lx, ly] = s.points[s.points.length - 1];
+    const step = Math.hypot(p[0] - lx, p[1] - ly);
+    if (step < MIN_STEP_PX) return;
+    s.length += step;
+    s.points.push(p);
+    setDraft([...s.points]);
+  }
+
+  function pointerUp() {
+    const s = stroke.current;
+    if (!s) return;
+    stroke.current = null;
+    setDraft([]);
+    // Barely moved: treat it as a click, which selects the hold under it
+    if (s.length < CLICK_PX) return setSelected(s.hit && s.hit !== selected ? s.hit : null);
+    const outline = simplify(s.points, SIMPLIFY_PX);
+    if (outline.length < 3) return;
+    const id = newId();
+    editHolds([
+      ...holds,
+      {
+        id,
+        points: outline.map(([x, y]) => [x / s.rect.width, y / s.rect.height]),
+      },
+    ]);
+    setSelected(id);
   }
 
   useEffect(() => {
     function onKey(e) {
       if (e.target.closest?.("input, textarea")) return;
-      if (e.key === "Enter") finishHold();
-      else if (e.key === "Escape") {
-        setDraft([]);
-        setSelected(null);
-      } else if (e.key === "Backspace" || e.key === "Delete") {
+      if (e.key === "Escape") setSelected(null);
+      else if ((e.key === "Backspace" || e.key === "Delete") && selected) {
         e.preventDefault();
-        if (draft.length) setDraft(draft.slice(0, -1));
-        else deleteSelected();
+        deleteSelected();
       }
     }
     window.addEventListener("keydown", onKey);
@@ -96,6 +136,7 @@ export default function WallEditor({ onClose }) {
     setError("");
     try {
       const w = await api.saveWall({ imageUrl: wall.imageUrl, holds });
+      forgetWall();
       setWall(w);
       setDirty(false);
     } catch (e) {
@@ -118,9 +159,9 @@ export default function WallEditor({ onClose }) {
     try {
       const imageUrl = await api.uploadFile(await toDisplayableImage(file));
       const w = await api.saveWall({ imageUrl, holds: [] });
+      forgetWall();
       setWall(w);
       setHolds([]);
-      setDraft([]);
       setSelected(null);
       setDirty(false);
     } catch (e) {
@@ -170,22 +211,10 @@ export default function WallEditor({ onClose }) {
             >
               +
             </button>
-            {draft.length > 0 ? (
-              <>
-                <button onClick={finishHold} disabled={draft.length < 3}>
-                  ✓ Finish hold
-                </button>
-                <button onClick={() => setDraft(draft.slice(0, -1))}>
-                  ↶ Undo point
-                </button>
-                <button onClick={() => setDraft([])}>Cancel</button>
-              </>
-            ) : (
-              selected && (
-                <button className="danger" onClick={deleteSelected}>
-                  🗑 Delete hold
-                </button>
-              )
+            {selected && (
+              <button className="danger" onClick={deleteSelected}>
+                🗑 Delete hold
+              </button>
             )}
           </>
         )}
@@ -202,10 +231,9 @@ export default function WallEditor({ onClose }) {
       {wall ? (
         <>
           <p className="muted">
-            {holds.length} hold{holds.length === 1 ? "" : "s"} traced. Click
-            around a hold's edge, then click the first point, double-click, or
-            press Enter to close it. Click a traced hold to select it;
-            Backspace undoes a point or deletes the selected hold.
+            {holds.length} hold{holds.length === 1 ? "" : "s"} traced. Draw
+            around a hold — letting go closes the outline. Click a traced hold
+            to select it; Backspace deletes the selected hold.
           </p>
           <div className="wall-scroll">
             <div className="wall-canvas" style={{ width: `${ZOOMS[zoom] * 100}%` }}>
@@ -214,7 +242,10 @@ export default function WallEditor({ onClose }) {
                 ref={svgRef}
                 viewBox="0 0 1 1"
                 preserveAspectRatio="none"
-                onClick={handleClick}
+                onPointerDown={pointerDown}
+                onPointerMove={pointerMove}
+                onPointerUp={pointerUp}
+                onPointerCancel={pointerUp}
               >
                 {holds.map((h) => (
                   <polygon
@@ -224,17 +255,13 @@ export default function WallEditor({ onClose }) {
                     className={`hold-shape ${h.id === selected ? "selected" : ""}`}
                   />
                 ))}
-                {draft.length > 0 && (
-                  <polyline points={toPoints(draft)} className="hold-draft" />
-                )}
               </svg>
-              {draft.map(([x, y], i) => (
-                <span
-                  key={i}
-                  className={`hold-vertex ${i === 0 && draft.length >= 3 ? "closer" : ""}`}
-                  style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
-                />
-              ))}
+              {draft.length > 1 && (
+                // Drawn in pixels while the stroke is live; stored as 0..1 on release
+                <svg className="hold-draft-layer">
+                  <polyline points={toPoints(draft)} className="hold-draft" />
+                </svg>
+              )}
             </div>
           </div>
         </>

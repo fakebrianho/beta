@@ -48,7 +48,18 @@ const routeSchema = new mongoose.Schema(
     gradeOverride: { type: String, default: null }, // coach's final say — beats the average
     tags: { type: [String], default: [] }, // style tags (slopers, crimps, ...)
     match: { type: Boolean, default: true }, // matching holds allowed?
-    imageUrl: { type: String, required: true }, // vertical hero image (Blob URL)
+    imageUrl: { type: String, default: null }, // vertical hero image (Blob URL)
+    // Or: set on the shared wall, as hold ids from its hold map with a role each
+    holds: {
+      type: [
+        {
+          _id: false,
+          hold: String,
+          role: { type: String, enum: ["start", "hand", "foot", "finish"] },
+        },
+      ],
+      default: [],
+    },
     notes: { type: String, default: "" },
     // A route is a bounty until someone proves it goes: the setter posting
     // beta clears the bounty (no FA), a non-setter sending it takes the FA.

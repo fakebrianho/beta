@@ -615,7 +615,7 @@ select {
 	width: 100%;
 	height: 100%;
 	cursor: crosshair;
-	touch-action: manipulation; /* no double-tap zoom while tracing */
+	touch-action: none; /* a finger draws instead of scrolling */
 }
 /* Outlines stay the same pixel width at any zoom or screen size */
 .wall-canvas svg * {
@@ -634,26 +634,165 @@ select {
 	stroke-width: 3px;
 }
 .hold-draft {
-	fill: none;
+	fill: rgba(79, 140, 255, 0.2);
 	stroke: var(--accent);
 	stroke-width: 2px;
-	stroke-dasharray: 6 4;
 }
-.hold-vertex {
-	position: absolute;
-	width: 8px;
-	height: 8px;
-	margin: -4px 0 0 -4px;
-	border-radius: 50%;
-	background: var(--accent);
-	border: 1px solid #fff;
+.wall-canvas .hold-draft-layer {
 	pointer-events: none;
 }
-.hold-vertex.closer {
-	width: 14px;
-	height: 14px;
-	margin: -7px 0 0 -7px;
+
+/* wall routes: the wall photo with a route's holds outlined */
+.wall-view * {
+	vector-effect: non-scaling-stroke;
+	stroke-linejoin: round;
+}
+.wall-view.loading {
+	aspect-ratio: 3 / 4;
+	background: var(--panel-2);
+}
+.wall-hold {
+	fill: transparent;
+	stroke: none;
+}
+.wall-hold.faint {
+	stroke: rgba(255, 255, 255, 0.45);
+	stroke-width: 1px;
+}
+.wall-hold-role polygon {
+	fill: transparent;
+	stroke-width: 4px;
+}
+.wall-hold-role .wall-hold-halo {
+	stroke: rgba(0, 0, 0, 0.6);
+	stroke-width: 7px;
+}
+.route-thumb .wall-hold-role polygon {
+	stroke-width: 3px;
+}
+.route-thumb .wall-hold-role .wall-hold-halo {
+	stroke-width: 5px;
+}
+.route-card .wall-view {
+	display: block;
+	width: 100%;
+	height: 100%;
+	background: #000;
+}
+.wall-view.route-hero {
+	display: block;
+	height: auto;
+}
+.route-admin-row .wall-view {
+	width: 44px;
+	height: 58px;
+	border-radius: 6px;
+	flex-shrink: 0;
+	background: #000;
+}
+.mini-route .wall-view {
+	width: 52px;
+	height: 68px;
+	border-radius: 8px;
+	flex-shrink: 0;
+	background: #000;
+}
+.role-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-top: 6px;
+	color: var(--muted);
+	font-size: 0.85rem;
+}
+.role-legend-item {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	text-transform: capitalize;
+}
+.role-swatch {
+	width: 12px;
+	height: 12px;
+	border: 3px solid;
+	border-radius: 4px;
+}
+
+/* setting a route on the wall */
+.modal.wide {
+	max-width: 900px;
+}
+.add-route-mode {
+	width: fit-content;
+	margin-top: 10px;
+}
+.wall-setter {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.wall-setter-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.wall-setter-bar .role-legend {
+	margin-top: 0;
+}
+.wall-setter-zoom {
+	display: flex;
+	gap: 4px;
+}
+.wall-setter-zoom button {
+	padding: 4px 10px;
+}
+.wall-setter-zoom button.on {
+	background: var(--accent);
+}
+.wall-setter-scroll {
+	overflow: auto;
+	max-height: 65vh;
+	border-radius: 10px;
+	background: #000;
+}
+.wall-setter-canvas {
+	position: relative;
+}
+.wall-setter-canvas .wall-view {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+.wall-setter .wall-hold,
+.wall-setter .wall-hold-role {
+	cursor: pointer;
+}
+.hold-picker {
+	position: absolute;
+	z-index: 2;
+	display: flex;
+	gap: 4px;
+	padding: 6px;
+	border-radius: 10px;
+	background: var(--panel);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+	transform: translate(-50%, 6px);
+	white-space: nowrap;
+}
+.hold-picker.above {
+	transform: translate(-50%, calc(-100% - 6px));
+}
+.hold-picker button {
+	padding: 4px 10px;
+	border: 2px solid #555;
+	font-size: 0.85rem;
+	text-transform: capitalize;
+}
+.hold-picker button.on {
 	background: #fff;
+	color: #000;
 }
 
 /* grade filter */

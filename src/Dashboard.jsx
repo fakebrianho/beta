@@ -4,12 +4,14 @@ import { toDisplayableImage } from "./image.js";
 import { TAGS, TAG_COLORS } from "./tags.js";
 import { compressVideo, posterFrom, MAX_UPLOAD_MB, tooBig } from "./video.js";
 import WallEditor from "./WallEditor.jsx";
+import { RouteImage, useWall } from "./WallView.jsx";
 
 export default function Dashboard({ role, onOpen }) {
   const [videos, setVideos] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [tagEditor, setTagEditor] = useState(null); // route id with tag editor open
   const [editingWall, setEditingWall] = useState(false);
+  const wall = useWall();
   const [progress, setProgress] = useState(null);
   const [stage, setStage] = useState("");
   const [error, setError] = useState("");
@@ -229,7 +231,7 @@ export default function Dashboard({ role, onOpen }) {
             {routes.map((r) => (
               <React.Fragment key={r.id}>
               <div className="route-admin-row">
-                <img src={r.imageUrl} alt="" />
+                <RouteImage route={r} wall={wall} className="route-thumb" />
                 <div className="route-admin-info">
                   <strong>{r.title}</strong>
                   <span className="muted">
