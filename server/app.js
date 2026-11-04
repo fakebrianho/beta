@@ -360,24 +360,55 @@ function suggestedGrade(sendGrades) {
   return { avg: Math.round(avg * 2) / 2, count: gs.length };
 }
 
+// Only people who sent a route can rate it, so votes ride on sends. Each
+// person counts once — an account by id, a guest by the name they typed —
+// with their most recent vote.
+const voterKey = (s) =>
+  s.user ? s.user.toString() : `guest:${s.author.trim().toLowerCase()}`;
+function rating(sends) {
+  const latest = new Map();
+  for (const s of [...sends].sort((a, b) => a.createdAt - b.createdAt))
+    if (s.vote) latest.set(voterKey(s), s.vote);
+  const votes = [...latest.values()];
+  return {
+    up: votes.filter((v) => v === 1).length,
+    down: votes.filter((v) => v === -1).length,
+  };
+}
+const cleanVote = (v) => (v === 1 || v === -1 ? v : null);
+
 app.get("/api/routes", async (req, res) => {
   const routes = await Route.find().sort({ createdAt: -1 });
-  const stats = await Send.aggregate([
-    { $match: { route: { $in: routes.map((r) => r._id) } } },
-    { $group: { _id: "$route", n: { $sum: 1 }, grades: { $push: "$grade" } } },
-  ]);
-  const byId = Object.fromEntries(stats.map((s) => [s._id.toString(), s]));
+  const sends = await Send.find({ route: { $in: routes.map((r) => r._id) } })
+    .select("route user author grade vote createdAt");
+  const byRoute = {};
+  for (const s of sends) (byRoute[s.route.toString()] ||= []).push(s);
   const viewer = await userFromReq(req);
   const faves = new Set((viewer?.favorites || []).map((f) => f.toString()));
   res.json(
-    routes.map((r) => ({
-      ...r.toJSON(),
-      sendCount: byId[r.id]?.n || 0,
-      displayGrade: displayGrade(r),
-      suggested: suggestedGrade(byId[r.id]?.grades || []),
-      favorited: faves.has(r.id),
-    }))
+    routes.map((r) => {
+      const rs = byRoute[r.id] || [];
+      return {
+        ...r.toJSON(),
+        sendCount: rs.length,
+        displayGrade: displayGrade(r),
+        suggested: suggestedGrade(rs.map((s) => s.grade)),
+        rating: rating(rs),
+        favorited: faves.has(r.id),
+      };
+    })
   );
+});
+
+// Change (or clear, with 0) your vote — only if you've sent the route
+app.post("/api/routes/:id/vote", requireAuth, async (req, res) => {
+  const route = await Route.findById(req.params.id).catch(() => null);
+  if (!route) return res.status(404).json({ error: "Not found" });
+  const filter = { route: route.id, user: req.user.id };
+  if (!(await Send.exists(filter)))
+    return res.status(403).json({ error: "Send it first, then rate it" });
+  await Send.updateMany(filter, { vote: cleanVote(req.body.vote) });
+  res.json({ ok: true });
 });
 
 // Heart a route (toggles)
@@ -437,6 +468,7 @@ app.get("/api/routes/:id", async (req, res) => {
   const grades = sends.map((s) => s.grade);
   const gv = gradeValue(route);
   const viewer = await userFromReq(req);
+  const mine = viewer ? sends.filter((s) => s.user?.equals(viewer._id)) : [];
   // Older routes predate the setter field; fall back to the owner's name
   const setter =
     route.setter ||
@@ -447,6 +479,9 @@ app.get("/api/routes/:id", async (req, res) => {
     setter,
     displayGrade: displayGrade(route),
     suggested: suggestedGrade(grades),
+    rating: rating(sends),
+    hasSent: mine.length > 0, // may rate it
+    myVote: [...mine].reverse().find((s) => s.vote)?.vote || null,
     favorited: !!viewer?.favorites.some((f) => f.equals(route._id)),
     sends: sends.map((s) => ({
       ...s.toJSON(),
@@ -764,7 +799,7 @@ app.patch("/api/users/:id/points", requireAuth, async (req, res) => {
 app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
-  const { videoUrl, posterUrl, author, grade, attempts } = req.body;
+  const { videoUrl, posterUrl, author, grade, attempts, vote } = req.body;
   const user = await userFromReq(req);
   const name = user?.name || author?.trim(); // signed-in sends use the account name
   if (!name) return res.status(400).json({ error: "Add your name" });
@@ -784,6 +819,7 @@ app.post("/api/routes/:id/sends", async (req, res) => {
     author: name,
     grade: sendGrade,
     attempts: tries,
+    vote: cleanVote(vote),
     fa: claimedFa,
     bounty: claimedBounty,
     points: scoreSend({

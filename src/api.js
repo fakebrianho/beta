@@ -52,6 +52,7 @@ export const api = {
       body: JSON.stringify(data),
     }).then(json),
   addSend: (routeId, data) => post(`/api/routes/${routeId}/sends`, data),
+  vote: (routeId, vote) => post(`/api/routes/${routeId}/vote`, { vote }),
   leaderboard: () => fetch("/api/leaderboard").then(json),
   toggleFavorite: (routeId) => post(`/api/routes/${routeId}/favorite`, {}),
   updateProfile: (data) =>

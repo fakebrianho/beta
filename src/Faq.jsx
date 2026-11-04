@@ -15,15 +15,15 @@ const FAQS = [
 	},
 	{
 		q: 'How do I submit a send?',
-		a: "Open a route in the gallery, scroll to the send form, enter your name, how many attempts it took, and optionally your grade opinion and a video of you doing the problem start to finish.",
+		a: 'Open a route in the gallery, scroll to the send form, enter your name, how many attempts it took, and optionally your grade opinion and a video of you doing the problem start to finish.',
 	},
 	{
 		q: 'How are grades decided?',
-		a: "The setter sets the grade. When you submit a send you can still say what you thought it was, and that shows up next to the route as what senders say, but it doesn't change the grade on its own. If enough people say a route is soft or sandbagged the setter will regrade it.",
+		a: "The setter sets the grade. When you submit a send you can still say what you thought it was, and that shows up next to the route as what senders say, but it doesn't change the grade on its own. If enough people say a route is soft or sandbagged the setter will regrade it. Depending on how many people complain about this, I may change to consensus grading. I originally did make this app to set training climbs in a less ego more you're shit get good mentality. Think B-pump grading.",
 	},
 	{
 		q: 'Do I need an account?',
-		a: "Not for browsing the gallery, logging sends or setting routes — a name is enough, and it's enough to show up on the leaderboard. You need an account for video coaching, and signed-in sends attach to your profile.",
+		a: "Not for browsing the gallery, logging sends or setting routes — a name is enough, and it's enough to show up on the leaderboard. You need an account for video coaching, and signed-in sends attach to your profile. You also won't be able to delete routes you set if you set a route w/o an account.",
 	},
 	{
 		q: 'How do I sign in without a password?',

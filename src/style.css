@@ -827,6 +827,39 @@ select {
 	accent-color: var(--accent);
 }
 
+/* ratings */
+.rating-badge {
+	display: inline-flex;
+	gap: 8px;
+}
+.rating-filter {
+	align-items: center;
+	margin-bottom: 8px;
+}
+.rating-filter .tag-chip {
+	cursor: pointer;
+}
+.rating-filter .tag-chip.on {
+	border-color: var(--accent);
+	color: var(--text);
+	font-weight: 600;
+}
+.vote-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 6px 0;
+}
+.vote-btn {
+	padding: 4px 12px;
+	border: 2px solid transparent;
+	font-size: 1rem;
+}
+.vote-btn.on {
+	border-color: var(--accent);
+	background: rgba(79, 140, 255, 0.2);
+}
+
 /* route tags */
 .tag-dots {
 	display: inline-flex;

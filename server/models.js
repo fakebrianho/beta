@@ -82,6 +82,7 @@ const sendSchema = new mongoose.Schema(
     author: { type: String, required: true },
     grade: { type: Number, min: 0, max: 17, default: null }, // sender's V-grade opinion
     attempts: { type: Number, min: 1, default: null },
+    vote: { type: Number, enum: [1, -1, null], default: null }, // 👍 / 👎 on the route
     fa: { type: Boolean, default: false }, // claimed the route's first ascent
     bounty: { type: Boolean, default: false }, // ...and beat the setter to it
     points: { type: Number, default: 0 }, // legacy snapshot; scores are computed live

@@ -20,6 +20,43 @@ const gradeNum = (r) => {
   return m ? Number(m[1]) : null;
 };
 
+// Share of 👍 among a route's votes, or null when nobody has rated it
+const ratingPct = (r) => {
+  const { up = 0, down = 0 } = r.rating || {};
+  return up + down ? Math.round((100 * up) / (up + down)) : null;
+};
+// Sorting runs after the grade/tag filters. The API already returns newest
+// first, and Array.sort is stable, so ties keep that order.
+const ups = (r) => r.rating?.up || 0;
+const downs = (r) => r.rating?.down || 0;
+const SORTS = [
+  { key: "new", label: "Newest", cmp: null },
+  { key: "ups", label: "Most 👍", cmp: (a, b) => ups(b) - ups(a) || downs(a) - downs(b) },
+  {
+    key: "pct",
+    label: "Best rated",
+    // Unrated routes go last; equal percentages favor more votes
+    cmp: (a, b) =>
+      (ratingPct(b) ?? -1) - (ratingPct(a) ?? -1) || ups(b) + downs(b) - (ups(a) + downs(a)),
+  },
+];
+
+// Raw 👍 / 👎 counts so you can eyeball whether people liked it
+export function RatingBadge({ route }) {
+  const pct = ratingPct(route);
+  if (pct === null) return null;
+  const { up, down } = route.rating;
+  return (
+    <span
+      className="badge rating-badge"
+      title={`${pct}% liked it, from people who sent it`}
+    >
+      <span>👍 {up}</span>
+      <span>👎 {down}</span>
+    </span>
+  );
+}
+
 // bounty = unproven, sent = setter posted beta (no FA), fa = someone beat the setter
 export function StatusBadge({ route, long }) {
   if (route.status === "bounty")
@@ -71,6 +108,7 @@ export default function Gallery({
   const [error, setError] = useState("");
   const [gradeRange, setGradeRange] = useState([0, 17]);
   const [tagFilter, setTagFilter] = useState([]);
+  const [sort, setSort] = useState("new");
   const wall = useWall();
 
   const [lo, hi] = gradeRange;
@@ -83,7 +121,9 @@ export default function Gallery({
     if (g !== null && (g < lo || g > hi)) return false; // ungraded routes always show
     return tagFilter.every((t) => r.tags?.includes(t));
   });
-  const hasFilter = lo > 0 || hi < 17 || tagFilter.length > 0;
+  const sortCmp = SORTS.find((s) => s.key === sort).cmp;
+  if (sortCmp) filtered.sort(sortCmp);
+  const hasFilter = lo > 0 || hi < 17 || tagFilter.length > 0 || sort !== "new";
 
   const refresh = () =>
     api.listRoutes().then(setRoutes).catch((e) => setError(e.message));
@@ -142,11 +182,24 @@ export default function Gallery({
             onClick={() => {
               setGradeRange([0, 17]);
               setTagFilter([]);
+              setSort("new");
             }}
           >
             reset
           </button>
         )}
+      </div>
+      <div className="tag-chips rating-filter">
+        <span className="muted">Sort:</span>
+        {SORTS.map((s) => (
+          <button
+            key={s.key}
+            className={`tag-chip ${sort === s.key ? "on" : ""}`}
+            onClick={() => setSort(s.key)}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
       <div className="tag-chips tag-filter">
         {TAGS.map((t) => {
@@ -199,6 +252,7 @@ export default function Gallery({
               <div className="badges">
                 <span className="badge grade">{r.displayGrade || r.grade}</span>
                 <StatusBadge route={r} />
+                <RatingBadge route={r} />
                 <TagDots tags={r.tags} onTag={toggleTagFilter} />
                 {r.sendCount > 0 && (
                   <span className="badge">{r.sendCount} send{r.sendCount > 1 ? "s" : ""}</span>
@@ -421,6 +475,16 @@ function RouteDetail({
   const [error, setError] = useState("");
   const [showBeta, setShowBeta] = useState(false);
   const [sendGrade, setSendGrade] = useState(null); // no default — V0 is a real answer
+  const [sendVote, setSendVote] = useState(null); // 1, -1, or no rating
+
+  async function rate(v) {
+    try {
+      await api.vote(route.id, route.myVote === v ? 0 : v);
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
   const formRef = useRef(null);
   // Coaches can delete any route; its setter only until someone sends it
   const canDelete =
@@ -476,12 +540,14 @@ function RouteDetail({
         posterUrl,
         author,
         grade: sendGrade,
+        vote: sendVote,
         attempts: Number(attempts),
       });
       if (claimedBounty) alert("🎉 First ascent — you mogged the setter!");
       else if (claimedFa) alert("🎉 First ascent! Your name's on it.");
       formRef.current.reset();
       setSendGrade(null); // form.reset() doesn't touch React state
+      setSendVote(null);
       onChanged();
     } catch (err) {
       setError(err.message);
@@ -541,7 +607,23 @@ function RouteDetail({
                 </span>
               )}
               <StatusBadge route={route} long />
+              <RatingBadge route={route} />
             </div>
+            {route.hasSent && (
+              <div className="vote-row">
+                <span className="muted">You sent it — rate it:</span>
+                {[1, -1].map((v) => (
+                  <button
+                    key={v}
+                    className={`vote-btn ${route.myVote === v ? "on" : ""}`}
+                    onClick={() => rate(v)}
+                    aria-pressed={route.myVote === v}
+                  >
+                    {v === 1 ? "👍" : "👎"}
+                  </button>
+                ))}
+              </div>
+            )}
             {route.tags?.length > 0 && (
               <div className="tag-chips">
                 {route.tags.map((t) => (
@@ -606,6 +688,8 @@ function RouteDetail({
                     {s.attempts != null &&
                       ` · ${s.attempts === 1 ? "⚡ flash" : `${s.attempts} attempts`}`}
                     {s.grade != null && ` · called it V${s.grade}`}
+                    {s.vote === 1 && " · 👍"}
+                    {s.vote === -1 && " · 👎"}
                     {s.points > 0 && ` · ${s.points} pts`} ·{" "}
                     {new Date(s.createdAt).toLocaleDateString()}
                   </span>
@@ -648,6 +732,20 @@ function RouteDetail({
                     </button>
                   ))}
                 </div>
+              </div>
+              <div className="vote-row">
+                <span className="muted">Rate it (optional):</span>
+                {[1, -1].map((v) => (
+                  <button
+                    type="button"
+                    key={v}
+                    className={`vote-btn ${sendVote === v ? "on" : ""}`}
+                    onClick={() => setSendVote(sendVote === v ? null : v)}
+                    aria-pressed={sendVote === v}
+                  >
+                    {v === 1 ? "👍" : "👎"}
+                  </button>
+                ))}
               </div>
               <label className="muted">
                 Got a video? Add it (optional) — keep it under 30 seconds, it
