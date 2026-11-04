@@ -336,7 +336,7 @@ app.delete("/api/videos/:id", requireAuth, loadVideo, async (req, res) => {
 // ---- Gallery routes (public: no sign-in needed to browse or submit sends) ----
 
 // Bounty = nobody has proven it goes yet. Setter beta clears the bounty
-// without an FA; a non-setter send takes the FA.
+// without an FA; the first send takes the FA.
 function syncStatus(route) {
   route.status = route.faBy ? "fa" : route.betaVideoUrl ? "sent" : "bounty";
 }
@@ -403,20 +403,24 @@ function cleanHolds(holds) {
   return [...byHold].map(([hold, role]) => ({ hold, role }));
 }
 
-app.post("/api/routes", requireAuth, async (req, res) => {
-  if (req.user.role !== "coach")
-    return res.status(403).json({ error: "Only coaches can add routes" });
+// Anyone can set a route. Signed in, the setter name defaults to the account
+// name; without an account it's required.
+app.post("/api/routes", async (req, res) => {
   // New routes are hold data on the shared wall — no per-route image upload
   const { title, grade, notes, match } = req.body;
+  const user = await userFromReq(req);
+  const setter = req.body.setter?.trim() || user?.name;
   const holds = cleanHolds(req.body.holds);
   if (!title) return res.status(400).json({ error: "Need a title" });
+  if (!setter) return res.status(400).json({ error: "Add the setter's name" });
   const count = (r) => holds.filter((h) => h.role === r).length;
   if (count("start") < 1 || count("start") > 2 || count("finish") < 1 || count("finish") > 2)
     return res
       .status(400)
       .json({ error: "A route needs 1–2 start holds and 1–2 finish holds" });
   const route = await Route.create({
-    owner: req.user.id,
+    owner: user?.id || null,
+    setter,
     title,
     grade: grade || "?",
     match: !!match,
@@ -433,8 +437,14 @@ app.get("/api/routes/:id", async (req, res) => {
   const grades = sends.map((s) => s.grade);
   const gv = gradeValue(route);
   const viewer = await userFromReq(req);
+  // Older routes predate the setter field; fall back to the owner's name
+  const setter =
+    route.setter ||
+    (route.owner && (await User.findById(route.owner).select("name"))?.name) ||
+    null;
   res.json({
     ...route.toJSON(),
+    setter,
     displayGrade: displayGrade(route),
     suggested: suggestedGrade(grades),
     favorited: !!viewer?.favorites.some((f) => f.equals(route._id)),
@@ -492,7 +502,7 @@ app.delete("/api/routes/:id", requireAuth, async (req, res) => {
   if (!route) return res.status(404).json({ error: "Not found" });
   const sends = await Send.find({ route: route.id });
   if (req.user.role !== "coach") {
-    if (!route.owner.equals(req.user.id))
+    if (!route.owner?.equals(req.user.id))
       return res.status(403).json({ error: "Only the route's setter can delete it" });
     if (sends.length)
       return res
@@ -570,7 +580,7 @@ function gradeValue(route) {
 }
 
 // Signed-in sends land on the account; anonymous sends land under the typed
-// name. Coaches never appear on the board.
+// name.
 function emptyRow({ id, name, avatarUrl, adjustment = 0, guest = false }) {
   return {
     id,
@@ -586,7 +596,7 @@ function emptyRow({ id, name, avatarUrl, adjustment = 0, guest = false }) {
 
 async function leaderboardRows() {
   const [users, routes, sends] = await Promise.all([
-    User.find({ role: { $ne: "coach" } }),
+    User.find(),
     Route.find(),
     Send.find(),
   ]);
@@ -620,7 +630,7 @@ async function leaderboardRows() {
   for (const s of sends) {
     if (s.user) {
       const row = byUser.get(s.user.toString());
-      if (!row) continue; // coach, or a deleted account
+      if (!row) continue; // deleted account
       credit(row, s);
       continue;
     }
@@ -750,7 +760,7 @@ app.patch("/api/users/:id/points", requireAuth, async (req, res) => {
 });
 
 // Submit a send: a typed name + optional video, not tied to an account.
-// The first send claims the FA and flips the bounty.
+// The first send claims the FA, whoever it's from — setter and coaches included.
 app.post("/api/routes/:id/sends", async (req, res) => {
   const route = await Route.findById(req.params.id).catch(() => null);
   if (!route) return res.status(404).json({ error: "Not found" });
@@ -762,22 +772,11 @@ app.post("/api/routes/:id/sends", async (req, res) => {
   if (!Number.isFinite(tries) || tries < 1)
     return res.status(400).json({ error: "How many attempts did it take?" });
   const g = Number(grade);
-  // The FA belongs to the first non-setter to send it. A setter send doesn't
-  // take the FA, but it does prove the route goes, so the bounty is gone.
-  // The bounty needs a route nobody has touched: no sends at all, no setter
-  // beta.
-  const isSetter = user?.role === "coach";
-  const coachIds = (await User.find({ role: "coach" }).select("_id")).map(
-    (u) => u._id
-  );
-  const prior = await Send.find({ route: route.id }).select("user");
-  const priorByOthers = prior.filter(
-    (s) => !s.user || !coachIds.some((c) => c.equals(s.user))
-  ).length;
-
-  const claimedFa = !isSetter && !route.faBy && priorByOthers === 0;
-  const claimedBounty =
-    claimedFa && prior.length === 0 && !route.betaVideoUrl;
+  // The bounty also needs a route nobody has touched: no earlier sends and
+  // no setter beta.
+  const priorSends = await Send.countDocuments({ route: route.id });
+  const claimedFa = !route.faBy;
+  const claimedBounty = claimedFa && priorSends === 0 && !route.betaVideoUrl;
   const sendGrade = Number.isFinite(g) && g >= 0 && g <= 17 ? g : null;
   const send = await Send.create({
     route: route.id,

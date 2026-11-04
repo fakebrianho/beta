@@ -42,7 +42,8 @@ const commentSchema = new mongoose.Schema(
 // first ascent video flips it to "fa"
 const routeSchema = new mongoose.Schema(
   {
-    owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }, // null when set without an account
+    setter: { type: String, default: null }, // setter's name as entered (or the account name)
     title: { type: String, required: true },
     grade: { type: String, default: "?" }, // proposed/suggested grade
     gradeOverride: { type: String, default: null }, // coach's final say — beats the average

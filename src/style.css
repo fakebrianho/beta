@@ -642,6 +642,11 @@ select {
 	pointer-events: none;
 }
 
+.danger-link {
+	align-self: flex-start;
+	color: var(--danger);
+}
+
 /* wall routes: the wall photo with a route's holds outlined */
 .wall-view * {
 	vector-effect: non-scaling-stroke;
@@ -661,17 +666,17 @@ select {
 }
 .wall-hold-role polygon {
 	fill: transparent;
-	stroke-width: 3px;
+	stroke-width: 2px;
 }
 .wall-hold-role .wall-hold-halo {
 	stroke: rgba(0, 0, 0, 0.6);
-	stroke-width: 6px;
+	stroke-width: 5px;
 }
 .route-thumb .wall-hold-role polygon {
-	stroke-width: 2px;
+	stroke-width: 1px;
 }
 .route-thumb .wall-hold-role .wall-hold-halo {
-	stroke-width: 4px;
+	stroke-width: 3px;
 }
 .route-card .wall-view {
 	display: block;

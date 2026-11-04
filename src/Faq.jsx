@@ -23,7 +23,7 @@ const FAQS = [
 	},
 	{
 		q: 'Do I need an account?',
-		a: "Not for browsing the gallery or logging sends — a name is enough to show up on the leaderboard. You need an account for video coaching, and signed-in sends attach to your profile.",
+		a: "Not for browsing the gallery, logging sends or setting routes — a name is enough, and it's enough to show up on the leaderboard. You need an account for video coaching, and signed-in sends attach to your profile.",
 	},
 	{
 		q: 'How do I sign in without a password?',

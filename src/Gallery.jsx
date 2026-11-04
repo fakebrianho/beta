@@ -65,7 +65,6 @@ export default function Gallery({
   initialRouteId,
   onConsumedInitialRoute,
 }) {
-  const role = user?.role || null;
   const [routes, setRoutes] = useState([]);
   const [openRoute, setOpenRoute] = useState(null); // full route with sends
   const [adding, setAdding] = useState(false);
@@ -113,11 +112,9 @@ export default function Gallery({
     <main className="dashboard">
       <div className="gallery-head">
         <h2>Route gallery</h2>
-        {role === "coach" && (
-          <button className="add-route-btn" onClick={() => setAdding(true)}>
-            + Add route
-          </button>
-        )}
+        <button className="add-route-btn" onClick={() => setAdding(true)}>
+          + Add route
+        </button>
       </div>
       <div className="grade-filter">
         <span className="muted">
@@ -173,7 +170,7 @@ export default function Gallery({
 
       {error && <p className="error">{error}</p>}
       {routes.length === 0 && (
-        <p className="muted">No routes yet. Coaches can add one.</p>
+        <p className="muted">No routes yet. Set one!</p>
       )}
       {routes.length > 0 && filtered.length === 0 && (
         <p className="muted">No routes match the current filters.</p>
@@ -215,6 +212,7 @@ export default function Gallery({
       {adding && (
         <AddRouteModal
           wall={wall}
+          user={user}
           onClose={() => setAdding(false)}
           onAdded={() => {
             setAdding(false);
@@ -232,6 +230,10 @@ export default function Gallery({
           onClose={() => setOpenRoute(null)}
           onChanged={async () => {
             await open(openRoute.id);
+            refresh();
+          }}
+          onDeleted={() => {
+            setOpenRoute(null);
             refresh();
           }}
         />
@@ -326,7 +328,7 @@ function WallSetter({ wall, holds, onChange }) {
 
 // New routes are set on the shared wall and stored as hold data only, so
 // adding one never uploads an image
-function AddRouteModal({ wall, onClose, onAdded }) {
+function AddRouteModal({ wall, user, onClose, onAdded }) {
   useScrollLock();
   const formRef = useRef(null);
   const [saving, setSaving] = useState(false);
@@ -344,6 +346,7 @@ function AddRouteModal({ wall, onClose, onAdded }) {
     try {
       await api.addRoute({
         title: fd.get("title"),
+        setter: (fd.get("setter") || "").trim(),
         grade: fd.get("grade"),
         match: fd.get("match") === "on",
         notes: fd.get("notes"),
@@ -375,6 +378,11 @@ function AddRouteModal({ wall, onClose, onAdded }) {
         ) : (
           <form ref={formRef} onSubmit={submit}>
             <input name="title" placeholder="Route name" required />
+            <input
+              name="setter"
+              placeholder={user ? `Setter (defaults to ${user.name})` : "Setter name"}
+              required={!user}
+            />
             <input name="grade" placeholder="Proposed grade (e.g. V6)" />
             <label className="check-label">
               <input name="match" type="checkbox" defaultChecked />
@@ -397,7 +405,15 @@ function AddRouteModal({ wall, onClose, onAdded }) {
   );
 }
 
-function RouteDetail({ route, wall, user, onToggleFavorite, onClose, onChanged }) {
+function RouteDetail({
+  route,
+  wall,
+  user,
+  onToggleFavorite,
+  onClose,
+  onChanged,
+  onDeleted,
+}) {
   useScrollLock();
   const signedIn = user != null;
   const [progress, setProgress] = useState(null);
@@ -406,6 +422,21 @@ function RouteDetail({ route, wall, user, onToggleFavorite, onClose, onChanged }
   const [showBeta, setShowBeta] = useState(false);
   const [sendGrade, setSendGrade] = useState(null); // no default — V0 is a real answer
   const formRef = useRef(null);
+  // Coaches can delete any route; its setter only until someone sends it
+  const canDelete =
+    user &&
+    (user.role === "coach" ||
+      (route.owner === user.id && route.sends.length === 0));
+
+  async function deleteRoute() {
+    if (!confirm(`Delete "${route.title}"?`)) return;
+    try {
+      await api.deleteRoute(route.id);
+      onDeleted();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   async function submitSend(e) {
     e.preventDefault();
@@ -524,7 +555,13 @@ function RouteDetail({ route, wall, user, onToggleFavorite, onClose, onChanged }
                 ))}
               </div>
             )}
+            {route.setter && <p className="muted">Set by {route.setter}</p>}
             {route.notes && <p className="muted">{route.notes}</p>}
+            {canDelete && (
+              <button className="link-btn danger-link" onClick={deleteRoute}>
+                🗑 Delete route
+              </button>
+            )}
 
             {route.betaVideoUrl ? (
               <div className={`beta-panel ${showBeta ? "open" : ""}`}>
