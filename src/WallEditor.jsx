@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { toDisplayableImage } from "./image.js";
-import { forgetWall } from "./WallView.jsx";
+import { bySizeDesc, forgetWall } from "./WallView.jsx";
 
 const MIN_STEP_PX = 2; // skip pointer samples closer than this to the last one
 const CLICK_PX = 6; // a stroke shorter than this is a click, not a drawing
@@ -247,7 +247,7 @@ export default function WallEditor({ onClose }) {
                 onPointerUp={pointerUp}
                 onPointerCancel={pointerUp}
               >
-                {holds.map((h) => (
+                {bySizeDesc(holds).map((h) => (
                   <polygon
                     key={h.id}
                     data-id={h.id}

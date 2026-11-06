@@ -60,6 +60,25 @@ function useImageSize(url) {
   return size;
 }
 
+// Shoelace area of a hold's outline (0..1 units — only used for ordering)
+const area = (pts) =>
+  Math.abs(
+    pts.reduce((sum, [x, y], i) => {
+      const [nx, ny] = pts[(i + 1) % pts.length];
+      return sum + x * ny - nx * y;
+    }, 0)
+  ) / 2;
+
+// Holds overlap when a small hold is bolted onto a big one. SVG gives taps to
+// whatever is drawn last, so draw biggest first: a small hold then always sits
+// on top of (and stays tappable over) the hold around it.
+const areas = new WeakMap();
+export const bySizeDesc = (holds) =>
+  [...holds].sort((a, b) => {
+    for (const h of [a, b]) if (!areas.has(h)) areas.set(h, area(h.points));
+    return areas.get(b) - areas.get(a);
+  });
+
 // Route holds come from the API as [{ hold, role }]; views want { holdId: role }
 export const holdMap = (holds) =>
   Object.fromEntries((holds || []).map((h) => [h.hold, h.role]));
@@ -122,7 +141,7 @@ export default function WallView({
           />
         </>
       )}
-      {wall.holds.map((h) => {
+      {bySizeDesc(wall.holds).map((h) => {
         const role = holds[h.id];
         if (!role && !showAll && !onTapHold) return null;
         const points = scaled(h.points);
